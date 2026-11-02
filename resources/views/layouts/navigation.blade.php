@@ -20,6 +20,11 @@
                             Quản trị
                         </x-nav-link>
                     @endif
+                    @if (Auth::user()->isStudent())
+                        <x-nav-link :href="route('exams.index')" :active="request()->routeIs('exams.*', 'attempts.*')">
+                            Làm bài
+                        </x-nav-link>
+                    @endif
                 </div>
             </div>
 
@@ -78,6 +83,11 @@
             @if (Auth::user()->isAdmin())
                 <x-responsive-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.*')">
                     Quản trị
+                </x-responsive-nav-link>
+            @endif
+            @if (Auth::user()->isStudent())
+                <x-responsive-nav-link :href="route('exams.index')" :active="request()->routeIs('exams.*', 'attempts.*')">
+                    Làm bài
                 </x-responsive-nav-link>
             @endif
         </div>
