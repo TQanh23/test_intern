@@ -46,7 +46,7 @@ Các thông tin trên chỉ dùng cho môi trường dev.
 
 ### Dữ liệu nào để MySQL, dữ liệu nào để MongoDB
 
-Đây là thiết kế đã chọn. Schema tương ứng chưa được code.
+Schema MySQL đã có migration. Phần MongoDB mới là thiết kế, chưa được code.
 
 | Nơi lưu | Dữ liệu | Lý do |
 |---|---|---|
@@ -92,15 +92,17 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 4 | Kết nối MongoDB | Một phần | Đã có package và connection. Chưa có Model Mongo. |
 | 5 | `app:check-connections` | Chưa làm | |
 | 6 | README | Xong | Cần cập nhật khi các task sau hoàn thành. |
-| 7–8 | Schema MySQL, collection MongoDB | Chưa làm | Mới có thiết kế ở trên. |
+| 7 | Schema MySQL | Xong | |
+| 8 | Collection MongoDB | Chưa làm | Mới có thiết kế ở trên. |
 | 9–14 | Tính năng chính | Chưa làm | |
 | 15–17 | Activity log, API, tổ chức code | Chưa làm | |
-| 18 | Feature test | Chưa làm | Mới có 2 test mẫu của Laravel. |
+| 18 | Feature test | Chưa làm | Mới có test mẫu của Laravel và test schema. Chưa có test chấm điểm, nộp quá giờ. |
 | 19 | Bonus | Chưa làm | |
 | 20–22 | Nâng cao | Chưa làm | Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
 
 Các hạn chế khác:
 
 - **Seed không tự chạy lại:** seeder hiện là mặc định của Laravel, chạy lại trên database đã có dữ liệu sẽ lỗi trùng email. Dùng `php artisan migrate:fresh --seed` để làm lại từ đầu.
+- **Test chạy bằng SQLite in-memory:** nhờ vậy test không đụng database dev, nhưng không phát hiện được lỗi riêng của MySQL.
 - **Chưa thử trên Linux và macOS:** các lệnh trên mới được chạy thử trên Windows 11 với Docker Desktop.
 - **Các commit khung Laravel không phải code tự viết:** chúng được chia nhỏ từ code do `composer create-project` sinh ra.
