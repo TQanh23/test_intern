@@ -6,7 +6,7 @@ Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
 ## Chạy dự án
 
-Chỉ cần Docker Desktop (hoặc Docker Engine có Compose v2) và các cổng `8000`, `3306`, `27018` đang trống. Không cần cài PHP, Composer, MySQL hay MongoDB trên máy.
+Chỉ cần Docker Desktop (hoặc Docker Engine có Compose v2) và các cổng `8000`, `3306`, `27018` đang trống. Không cần cài PHP, Composer, Node, MySQL hay MongoDB trên máy.
 
 ```bash
 git clone https://github.com/TQanh23/test_intern.git
@@ -30,6 +30,8 @@ Nếu trùng cổng, sửa phần `ports` trong `docker-compose.yml`. App không
 | Student | `student@example.com` | `password` |
 
 Seeder cũng tạo 2 đề: "Toán cơ bản" (15 phút, 5 câu) và "Tiếng Anh cơ bản" (10 phút, 4 câu), mỗi câu có 4 đáp án. Câu hỏi viết tay để biết trước đáp án đúng khi kiểm tra điểm. Các tài khoản này chỉ dùng cho dev và demo.
+
+Đăng nhập tại <http://localhost:8000/login>. Trang quản trị ở `/admin`, chỉ tài khoản admin mở được.
 
 ## Lệnh thường dùng
 
@@ -150,9 +152,17 @@ Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`
 
 - **PHP và Composer nằm trong container:** tránh phải cài extension `mongodb` trên từng máy.
 - **Entrypoint tự chuẩn bị app:** chỉ cần `docker compose up`. Nginx chờ healthcheck của `app` nên không trả lỗi 502 trong lúc cài dependency.
+- **Service `assets` build frontend mỗi lần khởi động:** trang dùng `@vite`, mà `public/build` là file sinh ra nên không commit vào git. Thiếu bước này thì clone mới sẽ lỗi 500 ở `/login`. Đổi lại, mỗi lần khởi động lâu hơn một chút. `node_modules` nằm trong named volume cùng lý do với `vendor`.
 - **`vendor` nằm trong named volume, không bind mount:** trên Windows, bind mount khiến mỗi lệnh `artisan` mất khoảng 14 giây, dùng volume còn khoảng 0,4 giây. Đổi lại, `vendor` trên máy không tự cập nhật, nên IDE có thể chưa gợi ý code của package mới.
 - **MongoDB mở ra máy qua cổng `27018`:** tránh trùng với MongoDB cài sẵn trên máy, thường chiếm `27017`.
 - **MySQL và MongoDB chỉ bind vào `127.0.0.1`:** MongoDB không đặt mật khẩu nên không được mở ra mạng ngoài.
+
+### Xác thực và phân quyền
+
+- **Breeze + Blade:** có sẵn đăng ký, đăng nhập và giới hạn số lần đăng nhập sai, đi kèm Alpine.js. PHP render trang nên dễ theo dõi hơn SPA.
+- **Sanctum chưa cài:** chỉ cần cho API, sẽ thêm khi làm API REST.
+- **Middleware `admin`:** `EnsureUserIsAdmin` trả 403 nếu user không phải admin. Đề chỉ có một vùng cần chặn nên không làm dạng `role:admin` tổng quát.
+- **`role` không nằm trong `$fillable`:** client gửi `role=admin` khi đăng ký vẫn chỉ tạo được student, có test kiểm tra.
 
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
@@ -182,7 +192,8 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 6 | README | Xong | Cần cập nhật khi các task sau hoàn thành. |
 | 7 | Schema MySQL | Xong | |
 | 8 | Collection MongoDB | Xong | |
-| 9–14 | Tính năng chính | Chưa làm | |
+| 9 | Đăng ký, đăng nhập, phân quyền | Xong | Giao diện Breeze còn bằng tiếng Anh. |
+| 10–14 | Tính năng chính | Chưa làm | |
 | 15–17 | Activity log, API, tổ chức code | Chưa làm | |
 | 18 | Feature test | Chưa làm | Mới có test mẫu của Laravel, test schema MySQL và test collection MongoDB. Chưa có test chấm điểm, nộp quá giờ. |
 | 19 | Bonus | Chưa làm | |
@@ -193,4 +204,5 @@ Các hạn chế khác:
 - **Seed không khôi phục dữ liệu đã sửa:** chạy lại `php artisan migrate --seed` không lỗi, nhưng tài khoản hoặc đề đã có sẽ được bỏ qua. Dùng `php artisan migrate:fresh --seed` để đưa MySQL về dữ liệu mẫu ban đầu, lệnh này xóa toàn bộ dữ liệu MySQL hiện có.
 - **Test chạy bằng SQLite in-memory và database MongoDB riêng `exam_testing`:** nhờ vậy test không đụng dữ liệu dev, nhưng không phát hiện được lỗi riêng của MySQL. Test cần container `mongo` đang chạy.
 - **Chưa thử trên Linux và macOS:** các lệnh trên mới được chạy thử trên Windows 11 với Docker Desktop.
+- **Code xác thực do Breeze sinh ra:** gồm controller trong `app/Http/Controllers/Auth`, view trong `resources/views/auth` và `profile`, test trong `tests/Feature/Auth`. Phần tự viết là middleware `admin`, trang `/admin` và `AdminAccessTest`.
 - **Các commit khung Laravel không phải code tự viết:** chúng được chia nhỏ từ code do `composer create-project` sinh ra.
