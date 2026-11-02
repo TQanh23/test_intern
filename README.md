@@ -172,6 +172,15 @@ Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`
 - **Tìm bằng `LIKE '%từ khóa%'`:** tìm được ở giữa tên nhưng không dùng được index `name`, chấp nhận được vì số đề ít.
 - **View phân trang nằm trong `resources/views/vendor/pagination`:** service `assets` không thấy `vendor/` của app, nên Tailwind chỉ quét được bản nằm trong `resources`.
 
+### Bắt đầu làm bài
+
+- **Tạo attempt bằng POST rồi chuyển hướng sang GET:** tải lại trang không tạo thêm attempt.
+- **Bấm bắt đầu lại sẽ tạo attempt mới:** đúng yêu cầu mỗi lần làm có attempt riêng. Chưa chặn 2 attempt mở song song.
+- **Admin không làm bài được:** middleware `student` trả 403, để điểm của admin không lọt vào thống kê.
+- **Quyền xem attempt nằm ở `AttemptPolicy`:** chỉ chủ attempt mở được, phải so theo từng bản ghi nên middleware không đủ.
+- **`deadline_at` do server tính khi bắt đầu:** client không gửi lên, và snapshot có `is_correct` nhưng view không in ra.
+- **Chỉ trộn câu hỏi:** đề không yêu cầu trộn đáp án.
+
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
 Đề yêu cầu Laravel 11, nhưng nhánh 11.x không còn được vá nên Composer chặn cài đặt. Dự án khóa ở `^11.57` và chỉ bỏ qua đúng 5 mã cảnh báo trong `composer.json`, không tắt cơ chế chặn.
@@ -202,7 +211,8 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 8 | Collection MongoDB | Xong | |
 | 9 | Đăng ký, đăng nhập, phân quyền | Xong | Giao diện Breeze còn bằng tiếng Anh. |
 | 10 | CRUD đề thi và câu hỏi | Xong | Thông báo validate còn bằng tiếng Anh. |
-| 11–14 | Tính năng chính | Chưa làm | |
+| 11 | Bắt đầu làm bài | Xong | Trang làm bài chưa nộp được, cần task 12. |
+| 12–14 | Tính năng chính | Chưa làm | |
 | 15–17 | Activity log, API, tổ chức code | Chưa làm | |
 | 18 | Feature test | Chưa làm | Mới có test mẫu của Laravel, test schema MySQL và test collection MongoDB. Chưa có test chấm điểm, nộp quá giờ. |
 | 19 | Bonus | Chưa làm | |

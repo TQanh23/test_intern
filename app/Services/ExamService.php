@@ -24,6 +24,19 @@ class ExamService
     }
 
     /**
+     * Danh sách đề cho student, bỏ các đề chưa có câu hỏi.
+     *
+     * @return LengthAwarePaginator<int, Exam>
+     */
+    public function paginateAvailable(): LengthAwarePaginator
+    {
+        return Exam::has('questions')
+            ->withCount('questions')
+            ->latest('id')
+            ->paginate(10);
+    }
+
+    /**
      * @param  array{content: string, options: list<string>, correct_option: int|string}  $data
      */
     public function createQuestion(Exam $exam, array $data): Question
