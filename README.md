@@ -26,7 +26,7 @@ Nếu trùng cổng, sửa phần `ports` trong `docker-compose.yml`. App không
 
 | Việc cần làm | Lệnh |
 |---|---|
-| Chạy test | `docker compose exec app php artisan test` |
+| Chạy test (cần container `mongo` đang chạy) | `docker compose exec app php artisan test` |
 | Chạy lệnh artisan | `docker compose exec app php artisan <lệnh>` |
 | Cài package PHP | `docker compose exec app composer require <package>` |
 | Chạy Vite (cần Node trên máy) | `npm install && npm run dev` |
@@ -46,7 +46,7 @@ Các thông tin trên chỉ dùng cho môi trường dev.
 
 ### Dữ liệu nào để MySQL, dữ liệu nào để MongoDB
 
-Schema MySQL đã có migration. Phần MongoDB mới là thiết kế, chưa được code.
+Schema MySQL đã có migration. Hai collection MongoDB đã có Model và index, nhưng chưa có tính năng nào ghi dữ liệu vào đó.
 
 | Nơi lưu | Dữ liệu | Lý do |
 |---|---|---|
@@ -107,6 +107,36 @@ erDiagram
 - **`users` đứng riêng:** không có khóa ngoại tới bảng đề thi, vì lượt làm bài nối học sinh với đề nằm ở `attempts` trong MongoDB.
 - **Không vẽ các bảng hạ tầng của Laravel:** `password_reset_tokens`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`.
 
+### Collection MongoDB
+
+Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`. Index được tạo bằng migration, dùng `table()` thay vì `create()` vì `migrate:fresh` không xóa collection.
+
+`attempts`:
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `user_id`, `exam_id` | int | Trùng id bên MySQL |
+| `exam_name`, `duration_minutes` | string, int | Snapshot, xóa đề vẫn còn |
+| `status` | string | `in_progress` hoặc `submitted` |
+| `started_at`, `deadline_at`, `submitted_at` | date | `submitted_at` để trống khi đang làm |
+| `score`, `total` | int | Số câu đúng và tổng số câu, để trống đến khi chấm |
+| `questions` | mảng | Snapshot câu hỏi: `question_id`, `content`, `options` (`option_id`, `content`, `is_correct`), `selected_option_id`, `is_correct` |
+| `created_at`, `updated_at` | date | |
+
+`activity_logs`:
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `user_id` | int | Để trống khi chưa đăng nhập |
+| `action` | string | Ví dụ `attempt.submitted` |
+| `exam_id` | int | Để trống khi hành động không gắn với đề |
+| `details` | object | Thông tin thêm, tùy hành động |
+| `created_at` | date | Không có `updated_at` vì log chỉ ghi thêm |
+
+- **`questions` không cast sang `array`:** cần giữ mảng thật trong MongoDB để `$unwind` ở phần thống kê hoạt động.
+- **`score` là số câu đúng:** các đề có số câu khác nhau, nên xếp hạng giữa các đề phải tính theo `score / total`.
+- **Cấu trúc document không được database ép buộc:** phần tạo và chấm attempt phải ghi đúng cấu trúc trên.
+
 ### Môi trường Docker
 
 - **PHP và Composer nằm trong container:** tránh phải cài extension `mongodb` trên từng máy.
@@ -138,20 +168,20 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 1 | Khởi tạo Laravel 11 | Xong | |
 | 2 | Docker hóa | Xong | |
 | 3 | Kết nối MySQL | Một phần | Đã có kết nối và migration mặc định. Chưa có seeder admin, student, đề thi mẫu. |
-| 4 | Kết nối MongoDB | Một phần | Đã có package và connection. Chưa có Model Mongo. |
+| 4 | Kết nối MongoDB | Xong | |
 | 5 | `app:check-connections` | Chưa làm | |
 | 6 | README | Xong | Cần cập nhật khi các task sau hoàn thành. |
 | 7 | Schema MySQL | Xong | |
-| 8 | Collection MongoDB | Chưa làm | Mới có thiết kế ở trên. |
+| 8 | Collection MongoDB | Xong | |
 | 9–14 | Tính năng chính | Chưa làm | |
 | 15–17 | Activity log, API, tổ chức code | Chưa làm | |
-| 18 | Feature test | Chưa làm | Mới có test mẫu của Laravel và test schema. Chưa có test chấm điểm, nộp quá giờ. |
+| 18 | Feature test | Chưa làm | Mới có test mẫu của Laravel, test schema MySQL và test collection MongoDB. Chưa có test chấm điểm, nộp quá giờ. |
 | 19 | Bonus | Chưa làm | |
 | 20–22 | Nâng cao | Chưa làm | Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
 
 Các hạn chế khác:
 
 - **Seed không tự chạy lại:** seeder hiện là mặc định của Laravel, chạy lại trên database đã có dữ liệu sẽ lỗi trùng email. Dùng `php artisan migrate:fresh --seed` để làm lại từ đầu.
-- **Test chạy bằng SQLite in-memory:** nhờ vậy test không đụng database dev, nhưng không phát hiện được lỗi riêng của MySQL.
+- **Test chạy bằng SQLite in-memory và database MongoDB riêng `exam_testing`:** nhờ vậy test không đụng dữ liệu dev, nhưng không phát hiện được lỗi riêng của MySQL. Test cần container `mongo` đang chạy.
 - **Chưa thử trên Linux và macOS:** các lệnh trên mới được chạy thử trên Windows 11 với Docker Desktop.
 - **Các commit khung Laravel không phải code tự viết:** chúng được chia nhỏ từ code do `composer create-project` sinh ra.
