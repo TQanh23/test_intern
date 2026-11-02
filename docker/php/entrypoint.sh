@@ -14,7 +14,7 @@ if [ "$1" = "php-fpm" ]; then
     # php-fpm runs as www-data, which does not own these on a Linux host bind mount.
     chmod -R a+rwX storage bootstrap/cache
 
-    # The default seeder is not idempotent, so it only runs against an empty database.
+    # Chỉ seed khi database trống, để không tạo lại đề mẫu mà admin đã xóa.
     if php artisan migrate:status > /dev/null 2>&1; then
         php artisan migrate --force
     else
