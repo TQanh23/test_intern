@@ -38,6 +38,7 @@ Seeder cũng tạo 2 đề: "Toán cơ bản" (15 phút, 5 câu) và "Tiếng An
 | Việc cần làm | Lệnh |
 |---|---|
 | Chạy test (cần container `mongo` đang chạy) | `docker compose exec app php artisan test` |
+| Kiểm tra định dạng code | `docker compose exec app ./vendor/bin/pint --test` |
 | Kiểm tra kết nối MySQL và MongoDB | `docker compose exec app php artisan app:check-connections` |
 | Chạy lệnh artisan | `docker compose exec app php artisan <lệnh>` |
 | Cài package PHP | `docker compose exec app composer require <package>` |
@@ -159,6 +160,13 @@ Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`
 - **MongoDB mở ra máy qua cổng `27018`:** tránh trùng với MongoDB cài sẵn trên máy, thường chiếm `27017`.
 - **MySQL và MongoDB chỉ bind vào `127.0.0.1`:** MongoDB không đặt mật khẩu nên không được mở ra mạng ngoài.
 
+### CI
+
+GitHub Actions chạy [.github/workflows/ci.yml](.github/workflows/ci.yml) cho mỗi PR và mỗi lần push lên `main`.
+
+- **Dùng lại Docker Compose, không cài PHP riêng trên runner:** `docker compose up -d` chạy đúng luồng của người dùng thật, nên kiểm tra luôn việc cài dependency, build frontend, migrate và seed trên MySQL. Không phải khai báo lại phiên bản PHP, extension và service ở hai nơi. Đổi lại mỗi lần chạy lâu hơn vì phải build image.
+- **Các bước kiểm tra:** Pint, toàn bộ test, rồi mở `/login` bằng `curl`. Test gọi `withoutVite()` nên bước `curl` mới phát hiện được lỗi 500 khi thiếu `public/build`.
+
 ### Xác thực và phân quyền
 
 - **Breeze + Blade:** có sẵn đăng ký, đăng nhập và giới hạn số lần đăng nhập sai, đi kèm Alpine.js. PHP render trang nên dễ theo dõi hơn SPA.
@@ -230,7 +238,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 Các hạn chế khác:
 
 - **Seed không khôi phục dữ liệu đã sửa:** chạy lại `php artisan migrate --seed` không lỗi, nhưng tài khoản hoặc đề đã có sẽ được bỏ qua. Dùng `php artisan migrate:fresh --seed` để đưa MySQL về dữ liệu mẫu ban đầu, lệnh này xóa toàn bộ dữ liệu MySQL hiện có.
-- **Test chạy bằng SQLite in-memory và database MongoDB riêng `exam_testing`:** nhờ vậy test không đụng dữ liệu dev, nhưng không phát hiện được lỗi riêng của MySQL. Test cần container `mongo` đang chạy.
+- **Test chạy bằng SQLite in-memory và database MongoDB riêng `exam_testing`:** nhờ vậy test không đụng dữ liệu dev, nhưng không phát hiện được lỗi truy vấn riêng của MySQL. CI chỉ chạy migrate và seed trên MySQL thật. Test cần container `mongo` đang chạy.
 - **Chưa thử trên Linux và macOS:** các lệnh trên mới được chạy thử trên Windows 11 với Docker Desktop.
 - **Code xác thực do Breeze sinh ra:** gồm controller trong `app/Http/Controllers/Auth`, view trong `resources/views/auth` và `profile`, test trong `tests/Feature/Auth`. Phần tự viết là middleware `admin`, trang `/admin` và `AdminAccessTest`.
 - **Các commit khung Laravel không phải code tự viết:** chúng được chia nhỏ từ code do `composer create-project` sinh ra.
