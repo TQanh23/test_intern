@@ -144,7 +144,8 @@ class StartAttemptTest extends TestCase
                 ->assertOk()
                 ->assertSee('Câu 1')
                 ->assertSee('Đúng 1')
-                ->assertDontSee('is_correct', false);
+                ->assertDontSee('is_correct', false)
+                ->assertDontSee('Đáp án đúng');
         }
 
         $this->assertSame(1, Attempt::count());

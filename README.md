@@ -2,7 +2,7 @@
 
 Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
-**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài và chấm điểm. Chưa có trang kết quả, thống kê, activity log và API. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
+**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài, chấm điểm và trang kết quả. Chưa có thống kê, activity log và API. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
 
 ## Chạy dự án
 
@@ -197,6 +197,12 @@ GitHub Actions chạy [.github/workflows/ci.yml](.github/workflows/ci.yml) cho m
 - **Chấm theo snapshot, không đọc MySQL:** admin sửa đề sau khi học sinh bắt đầu không làm đổi điểm.
 - **Ghi kết quả kèm điều kiện `status = in_progress`:** MongoDB xử lý một lần cập nhật một cách nguyên tử, nên hai request nộp cùng lúc chỉ có một request ghi được.
 
+### Trang kết quả
+
+- **Dùng lại trang `attempts.show`, không thêm route riêng:** route, policy và redirect sau khi nộp đã có sẵn, trang chỉ đổi nội dung theo `status`.
+- **Đọc từ snapshot, không đọc MySQL:** kết quả giữ nguyên khi admin sửa hoặc xóa đề, và không phát sinh query theo từng câu.
+- **Chỉ hiện đáp án khi `status = submitted`:** bài quá giờ vẫn là `in_progress` nên không hiện đáp án, vì học sinh có thể bắt đầu lại đề.
+
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
 Đề yêu cầu Laravel 11, nhưng nhánh 11.x không còn được vá nên Composer chặn cài đặt. Dự án khóa ở `^11.57` và chỉ bỏ qua đúng 5 mã cảnh báo trong `composer.json`, không tắt cơ chế chặn.
@@ -229,7 +235,8 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 10 | CRUD đề thi và câu hỏi | Xong | Thông báo validate còn bằng tiếng Anh. |
 | 11 | Bắt đầu làm bài | Xong | |
 | 12 | Nộp bài và chấm điểm | Xong | Chưa có đồng hồ đếm ngược, trang chỉ hiện giờ hạn nộp. |
-| 13–14 | Tính năng chính | Chưa làm | |
+| 13 | Trang kết quả | Xong | Chưa có lịch sử làm bài, rời trang rồi chỉ mở lại được kết quả qua URL. |
+| 14 | Thống kê admin | Chưa làm | |
 | 15–17 | Activity log, API, tổ chức code | Chưa làm | |
 | 18 | Feature test | Một phần | Đã có test chấm điểm và nộp quá giờ. Các tính năng chưa làm chưa có test. |
 | 19 | Bonus | Chưa làm | |
@@ -237,6 +244,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 
 Các hạn chế khác:
 
+- **Xem đáp án rồi làm lại được điểm tối đa:** đề không giới hạn số lần làm, nên học sinh có thể nộp một lần để xem đáp án rồi bắt đầu lại.
 - **Seed không khôi phục dữ liệu đã sửa:** chạy lại `php artisan migrate --seed` không lỗi, nhưng tài khoản hoặc đề đã có sẽ được bỏ qua. Dùng `php artisan migrate:fresh --seed` để đưa MySQL về dữ liệu mẫu ban đầu, lệnh này xóa toàn bộ dữ liệu MySQL hiện có.
 - **Test chạy bằng SQLite in-memory và database MongoDB riêng `exam_testing`:** nhờ vậy test không đụng dữ liệu dev, nhưng không phát hiện được lỗi truy vấn riêng của MySQL. CI chỉ chạy migrate và seed trên MySQL thật. Test cần container `mongo` đang chạy.
 - **Chưa thử trên macOS:** các lệnh trên đã chạy thử trên Windows 11 với Docker Desktop. Trên Linux, CI chạy trên Ubuntu mới kiểm tra `docker compose up -d`, test và trang `/login`.
