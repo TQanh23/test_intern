@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # Giống người chấm chạy: lệnh này chỉ xong khi đã cài dependency, build frontend, migrate và seed.
+      - name: Khởi động stack
+        run: docker compose up -d
+
+      - name: Kiểm tra định dạng code
+        run: docker compose exec -T app ./vendor/bin/pint --test
+
+      - name: Chạy test
+        run: docker compose exec -T app php artisan test
+
+      # Test gọi withoutVite() nên không thấy lỗi 500 khi thiếu public/build.
+      - name: Mở trang đăng nhập
+        run: curl -fsS --retry 5 --retry-connrefused --retry-delay 2 -o /dev/null http://localhost:8000/login
+
+      # Migrate và seed chạy trong entrypoint, nên output chỉ nằm trong log container.
+      - name: In log container
+        if: always()
+        run: docker compose logs --tail=200
