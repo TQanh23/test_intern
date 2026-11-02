@@ -58,6 +58,55 @@ Schema MySQL đã có migration. Phần MongoDB mới là thiết kế, chưa đ
 - **Thống kê:** điểm trung bình, top học sinh và câu sai nhiều đều nằm trong `attempts`, nên dùng aggregation của MongoDB.
 - **Đánh đổi:** MongoDB không có foreign key tới MySQL. `user_id` và `exam_id` trong `attempts` phải do code ứng dụng giữ đúng.
 
+### ERD MySQL
+
+```mermaid
+erDiagram
+    exams ||--o{ questions : "có"
+    questions ||--o{ options : "có"
+
+    users {
+        bigint id PK
+        varchar name
+        varchar email UK
+        timestamp email_verified_at "nullable"
+        varchar password
+        enum role "admin hoặc student, có index"
+        varchar remember_token "nullable"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    exams {
+        bigint id PK
+        varchar name "có index"
+        smallint duration_minutes
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    questions {
+        bigint id PK
+        bigint exam_id FK
+        text content
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    options {
+        bigint id PK
+        bigint question_id FK
+        text content
+        boolean is_correct "mặc định false"
+        timestamp created_at
+        timestamp updated_at
+    }
+```
+
+- **Xóa theo:** xóa một đề sẽ xóa các câu hỏi của đề đó, xóa một câu hỏi sẽ xóa các đáp án của câu đó (`ON DELETE CASCADE`).
+- **`users` đứng riêng:** không có khóa ngoại tới bảng đề thi, vì lượt làm bài nối học sinh với đề nằm ở `attempts` trong MongoDB.
+- **Không vẽ các bảng hạ tầng của Laravel:** `password_reset_tokens`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`.
+
 ### Môi trường Docker
 
 - **PHP và Composer nằm trong container:** tránh phải cài extension `mongodb` trên từng máy.
