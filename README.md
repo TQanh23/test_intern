@@ -41,6 +41,7 @@ Seeder cũng tạo 2 đề: "Toán cơ bản" (15 phút, 5 câu) và "Tiếng An
 | Chạy lệnh artisan | `docker compose exec app php artisan <lệnh>` |
 | Cài package PHP | `docker compose exec app composer require <package>` |
 | Chạy Vite (cần Node trên máy) | `npm install && npm run dev` |
+| Build lại frontend | `docker compose run --rm assets` |
 | Tắt stack, giữ dữ liệu | `docker compose down` |
 | Tắt stack, xóa cả dữ liệu | `docker compose down -v` |
 
@@ -164,6 +165,13 @@ Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`
 - **Middleware `admin`:** `EnsureUserIsAdmin` trả 403 nếu user không phải admin. Đề chỉ có một vùng cần chặn nên không làm dạng `role:admin` tổng quát.
 - **`role` không nằm trong `$fillable`:** client gửi `role=admin` khi đăng ký vẫn chỉ tạo được student, có test kiểm tra.
 
+### Quản lý đề thi
+
+- **Mỗi câu có đúng 4 đáp án, chọn đáp án đúng bằng radio:** form đơn giản và luôn có đúng 1 đáp án đúng. Đổi lại không tạo được câu chỉ có 2 đáp án.
+- **Sửa câu hỏi thì xóa đáp án cũ rồi tạo lại trong transaction:** không phải đối chiếu từng đáp án. `option_id` thay đổi nhưng không ảnh hưởng bài đã làm, vì `attempts` chấm theo snapshot.
+- **Tìm bằng `LIKE '%từ khóa%'`:** tìm được ở giữa tên nhưng không dùng được index `name`, chấp nhận được vì số đề ít.
+- **View phân trang nằm trong `resources/views/vendor/pagination`:** service `assets` không thấy `vendor/` của app, nên Tailwind chỉ quét được bản nằm trong `resources`.
+
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
 Đề yêu cầu Laravel 11, nhưng nhánh 11.x không còn được vá nên Composer chặn cài đặt. Dự án khóa ở `^11.57` và chỉ bỏ qua đúng 5 mã cảnh báo trong `composer.json`, không tắt cơ chế chặn.
@@ -193,7 +201,8 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 7 | Schema MySQL | Xong | |
 | 8 | Collection MongoDB | Xong | |
 | 9 | Đăng ký, đăng nhập, phân quyền | Xong | Giao diện Breeze còn bằng tiếng Anh. |
-| 10–14 | Tính năng chính | Chưa làm | |
+| 10 | CRUD đề thi và câu hỏi | Xong | Thông báo validate còn bằng tiếng Anh. |
+| 11–14 | Tính năng chính | Chưa làm | |
 | 15–17 | Activity log, API, tổ chức code | Chưa làm | |
 | 18 | Feature test | Chưa làm | Mới có test mẫu của Laravel, test schema MySQL và test collection MongoDB. Chưa có test chấm điểm, nộp quá giờ. |
 | 19 | Bonus | Chưa làm | |
