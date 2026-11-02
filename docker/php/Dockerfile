@@ -5,3 +5,7 @@ RUN apk add --no-cache git \
     && install-php-extensions pdo_mysql mongodb bcmath intl zip pcntl gd opcache
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --chmod=0755 entrypoint.sh /usr/local/bin/app-entrypoint
+
+ENTRYPOINT ["app-entrypoint"]
+CMD ["php-fpm"]
