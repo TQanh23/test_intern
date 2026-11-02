@@ -29,6 +29,7 @@ jobs:
       - name: Mở trang đăng nhập
         run: curl -fsS --retry 5 --retry-connrefused --retry-delay 2 -o /dev/null http://localhost:8000/login
 
-      - name: In log khi lỗi
-        if: failure()
+      # Migrate và seed chạy trong entrypoint, nên output chỉ nằm trong log container.
+      - name: In log container
+        if: always()
         run: docker compose logs --tail=200
