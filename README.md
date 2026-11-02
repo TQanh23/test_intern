@@ -22,6 +22,15 @@ Sau khi sửa `docker/php/`, chạy `docker compose up -d --build` để build l
 
 Nếu trùng cổng, sửa phần `ports` trong `docker-compose.yml`. App không bị ảnh hưởng vì các container gọi nhau qua cổng nội bộ.
 
+### Dữ liệu mẫu
+
+| Vai trò | Email | Mật khẩu |
+|---|---|---|
+| Admin | `admin@example.com` | `password` |
+| Student | `student@example.com` | `password` |
+
+Seeder cũng tạo 2 đề: "Toán cơ bản" (15 phút, 5 câu) và "Tiếng Anh cơ bản" (10 phút, 4 câu), mỗi câu có 4 đáp án. Câu hỏi viết tay để biết trước đáp án đúng khi kiểm tra điểm. Các tài khoản này chỉ dùng cho dev và demo.
+
 ## Lệnh thường dùng
 
 | Việc cần làm | Lệnh |
@@ -167,7 +176,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 |---|---|---|---|
 | 1 | Khởi tạo Laravel 11 | Xong | |
 | 2 | Docker hóa | Xong | |
-| 3 | Kết nối MySQL | Một phần | Đã có kết nối và migration mặc định. Chưa có seeder admin, student, đề thi mẫu. |
+| 3 | Kết nối MySQL | Xong | |
 | 4 | Kết nối MongoDB | Xong | |
 | 5 | `app:check-connections` | Chưa làm | |
 | 6 | README | Xong | Cần cập nhật khi các task sau hoàn thành. |
@@ -181,7 +190,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 
 Các hạn chế khác:
 
-- **Seed không tự chạy lại:** seeder hiện là mặc định của Laravel, chạy lại trên database đã có dữ liệu sẽ lỗi trùng email. Dùng `php artisan migrate:fresh --seed` để làm lại từ đầu.
+- **Seed không khôi phục dữ liệu đã sửa:** chạy lại `php artisan migrate --seed` không lỗi, nhưng tài khoản hoặc đề đã có sẽ được bỏ qua. Dùng `php artisan migrate:fresh --seed` để đưa MySQL về dữ liệu mẫu ban đầu, lệnh này xóa toàn bộ dữ liệu MySQL hiện có.
 - **Test chạy bằng SQLite in-memory và database MongoDB riêng `exam_testing`:** nhờ vậy test không đụng dữ liệu dev, nhưng không phát hiện được lỗi riêng của MySQL. Test cần container `mongo` đang chạy.
 - **Chưa thử trên Linux và macOS:** các lệnh trên mới được chạy thử trên Windows 11 với Docker Desktop.
 - **Các commit khung Laravel không phải code tự viết:** chúng được chia nhỏ từ code do `composer create-project` sinh ra.
