@@ -9,7 +9,10 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
-                    Xin chào {{ auth()->user()->name }}. Chỉ tài khoản admin mới vào được trang này.
+                    <p>Xin chào {{ auth()->user()->name }}. Chỉ tài khoản admin mới vào được trang này.</p>
+                    <a href="{{ route('admin.exams.index') }}" class="mt-4 inline-block font-medium text-indigo-600 hover:text-indigo-800">
+                        Quản lý đề thi
+                    </a>
                 </div>
             </div>
         </div>
