@@ -2,7 +2,7 @@
 
 Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
-**Trạng thái hiện tại:** mới xong phần lớn phần setup, chưa có tính năng nghiệp vụ. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
+**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài và chấm điểm. Chưa có trang kết quả, thống kê, activity log và API. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
 
 ## Chạy dự án
 
@@ -38,6 +38,7 @@ Seeder cũng tạo 2 đề: "Toán cơ bản" (15 phút, 5 câu) và "Tiếng An
 | Việc cần làm | Lệnh |
 |---|---|
 | Chạy test (cần container `mongo` đang chạy) | `docker compose exec app php artisan test` |
+| Kiểm tra kết nối MySQL và MongoDB | `docker compose exec app php artisan app:check-connections` |
 | Chạy lệnh artisan | `docker compose exec app php artisan <lệnh>` |
 | Cài package PHP | `docker compose exec app composer require <package>` |
 | Chạy Vite (cần Node trên máy) | `npm install && npm run dev` |
@@ -212,7 +213,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 2 | Docker hóa | Xong | |
 | 3 | Kết nối MySQL | Xong | |
 | 4 | Kết nối MongoDB | Xong | |
-| 5 | `app:check-connections` | Chưa làm | |
+| 5 | `app:check-connections` | Xong | |
 | 6 | README | Xong | Cần cập nhật khi các task sau hoàn thành. |
 | 7 | Schema MySQL | Xong | |
 | 8 | Collection MongoDB | Xong | |
@@ -222,7 +223,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 12 | Nộp bài và chấm điểm | Xong | Chưa có đồng hồ đếm ngược, trang chỉ hiện giờ hạn nộp. |
 | 13–14 | Tính năng chính | Chưa làm | |
 | 15–17 | Activity log, API, tổ chức code | Chưa làm | |
-| 18 | Feature test | Chưa làm | Mới có test mẫu của Laravel, test schema MySQL và test collection MongoDB. Chưa có test chấm điểm, nộp quá giờ. |
+| 18 | Feature test | Một phần | Đã có test chấm điểm và nộp quá giờ. Các tính năng chưa làm chưa có test. |
 | 19 | Bonus | Chưa làm | |
 | 20–22 | Nâng cao | Chưa làm | Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
 
