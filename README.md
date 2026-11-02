@@ -46,7 +46,7 @@ Các thông tin trên chỉ dùng cho môi trường dev.
 
 ### Dữ liệu nào để MySQL, dữ liệu nào để MongoDB
 
-Đây là thiết kế đã chọn. Schema tương ứng chưa được code.
+Schema MySQL đã có migration. Phần MongoDB mới là thiết kế, chưa được code.
 
 | Nơi lưu | Dữ liệu | Lý do |
 |---|---|---|
@@ -57,6 +57,55 @@ Các thông tin trên chỉ dùng cho môi trường dev.
 - **Vì sao `attempts` cần snapshot:** nếu admin sửa hoặc xóa câu hỏi sau khi thi, bài đã nộp vẫn phải giữ nguyên nội dung và điểm.
 - **Thống kê:** điểm trung bình, top học sinh và câu sai nhiều đều nằm trong `attempts`, nên dùng aggregation của MongoDB.
 - **Đánh đổi:** MongoDB không có foreign key tới MySQL. `user_id` và `exam_id` trong `attempts` phải do code ứng dụng giữ đúng.
+
+### ERD MySQL
+
+```mermaid
+erDiagram
+    exams ||--o{ questions : "có"
+    questions ||--o{ options : "có"
+
+    users {
+        bigint id PK
+        varchar name
+        varchar email UK
+        timestamp email_verified_at "nullable"
+        varchar password
+        enum role "admin hoặc student, có index"
+        varchar remember_token "nullable"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    exams {
+        bigint id PK
+        varchar name "có index"
+        smallint duration_minutes
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    questions {
+        bigint id PK
+        bigint exam_id FK
+        text content
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    options {
+        bigint id PK
+        bigint question_id FK
+        text content
+        boolean is_correct "mặc định false"
+        timestamp created_at
+        timestamp updated_at
+    }
+```
+
+- **Xóa theo:** xóa một đề sẽ xóa các câu hỏi của đề đó, xóa một câu hỏi sẽ xóa các đáp án của câu đó (`ON DELETE CASCADE`).
+- **`users` đứng riêng:** không có khóa ngoại tới bảng đề thi, vì lượt làm bài nối học sinh với đề nằm ở `attempts` trong MongoDB.
+- **Không vẽ các bảng hạ tầng của Laravel:** `password_reset_tokens`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`.
 
 ### Môi trường Docker
 
@@ -92,15 +141,17 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 4 | Kết nối MongoDB | Một phần | Đã có package và connection. Chưa có Model Mongo. |
 | 5 | `app:check-connections` | Chưa làm | |
 | 6 | README | Xong | Cần cập nhật khi các task sau hoàn thành. |
-| 7–8 | Schema MySQL, collection MongoDB | Chưa làm | Mới có thiết kế ở trên. |
+| 7 | Schema MySQL | Xong | |
+| 8 | Collection MongoDB | Chưa làm | Mới có thiết kế ở trên. |
 | 9–14 | Tính năng chính | Chưa làm | |
 | 15–17 | Activity log, API, tổ chức code | Chưa làm | |
-| 18 | Feature test | Chưa làm | Mới có 2 test mẫu của Laravel. |
+| 18 | Feature test | Chưa làm | Mới có test mẫu của Laravel và test schema. Chưa có test chấm điểm, nộp quá giờ. |
 | 19 | Bonus | Chưa làm | |
 | 20–22 | Nâng cao | Chưa làm | Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
 
 Các hạn chế khác:
 
 - **Seed không tự chạy lại:** seeder hiện là mặc định của Laravel, chạy lại trên database đã có dữ liệu sẽ lỗi trùng email. Dùng `php artisan migrate:fresh --seed` để làm lại từ đầu.
+- **Test chạy bằng SQLite in-memory:** nhờ vậy test không đụng database dev, nhưng không phát hiện được lỗi riêng của MySQL.
 - **Chưa thử trên Linux và macOS:** các lệnh trên mới được chạy thử trên Windows 11 với Docker Desktop.
 - **Các commit khung Laravel không phải code tự viết:** chúng được chia nhỏ từ code do `composer create-project` sinh ra.
