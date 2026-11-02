@@ -6,6 +6,8 @@ services:
       # Bind-mounted vendor takes ~14s per request on Windows, so it lives in a volume.
       - vendor:/var/www/html/vendor
     depends_on:
+      assets:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       mongo:
@@ -17,6 +19,15 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10m
+
+  # Trang Breeze dùng @vite, mà public/build không nằm trong git nên phải build khi khởi động.
+  assets:
+    image: node:22-alpine
+    working_dir: /var/www/html
+    command: sh -c "npm ci && npm run build"
+    volumes:
+      - .:/var/www/html
+      - node_modules:/var/www/html/node_modules
 
   nginx:
     image: nginx:1.27-alpine
@@ -62,5 +73,6 @@ services:
 
 volumes:
   vendor:
+  node_modules:
   mysql_data:
   mongo_data:
