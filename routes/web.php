@@ -30,6 +30,9 @@ Route::middleware(['auth', 'student'])->group(function () {
     Route::get('/attempts/{attempt}', [AttemptController::class, 'show'])
         ->middleware('can:view,attempt')
         ->name('attempts.show');
+    Route::post('/attempts/{attempt}/submit', [AttemptController::class, 'submit'])
+        ->middleware('can:view,attempt')
+        ->name('attempts.submit');
 });
 
 Route::middleware('auth')->group(function () {
