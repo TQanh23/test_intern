@@ -17,6 +17,36 @@
                 <div class="bg-white shadow-sm sm:rounded-lg p-6">
                     <p class="text-gray-900">Kết quả: <span class="font-semibold">{{ $attempt->score }}/{{ $attempt->total }}</span> câu đúng.</p>
                 </div>
+
+                @foreach ($attempt->questions as $question)
+                    <div class="bg-white shadow-sm sm:rounded-lg p-6">
+                        <p class="font-medium text-gray-900">{{ $loop->iteration }}. {{ $question['content'] }}</p>
+
+                        <p @class(['mt-1 text-sm font-semibold', 'text-green-700' => $question['is_correct'], 'text-red-600' => ! $question['is_correct']])>
+                            @if ($question['is_correct'])
+                                Câu đúng
+                            @elseif ($question['selected_option_id'] === null)
+                                Chưa trả lời
+                            @else
+                                Câu sai
+                            @endif
+                        </p>
+
+                        <ul class="mt-4 space-y-2 text-gray-700">
+                            @foreach ($question['options'] as $option)
+                                <li @class(['font-semibold text-green-700' => $option['is_correct']])>
+                                    {{ $option['content'] }}
+                                    @if ($option['option_id'] === $question['selected_option_id'])
+                                        (Bạn chọn)
+                                    @endif
+                                    @if ($option['is_correct'])
+                                        (Đáp án đúng)
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endforeach
             @elseif ($attempt->isExpired())
                 <div class="bg-white shadow-sm sm:rounded-lg p-6">
                     <p class="text-gray-900">Đã hết giờ làm bài. Bài này không được chấm điểm.</p>

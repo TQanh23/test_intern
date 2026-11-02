@@ -255,7 +255,6 @@ class SubmitAttemptTest extends TestCase
         $this->get("/attempts/{$attempt->id}")
             ->assertOk()
             ->assertSee('3/3')
-            ->assertDontSee('Đúng 1')
             ->assertDontSee('Nộp bài');
     }
 
@@ -268,6 +267,67 @@ class SubmitAttemptTest extends TestCase
         $this->get("/attempts/{$attempt->id}")
             ->assertOk()
             ->assertSee('Đã hết giờ')
-            ->assertDontSee('Nộp bài');
+            ->assertDontSee('Nộp bài')
+            ->assertDontSee('Đúng 1')
+            ->assertDontSee('Đáp án đúng');
+    }
+
+    public function test_result_labels_correct_wrong_and_blank_questions(): void
+    {
+        $attempt = $this->startAttempt();
+        [$first, $second] = $this->exam->questions()->pluck('id')->all();
+
+        $this->submit($attempt, ['answers' => [
+            $first => $this->answers(true)[$first],
+            $second => $this->answers(false)[$second],
+        ]]);
+
+        $response = $this->get("/attempts/{$attempt->id}")
+            ->assertOk()
+            ->assertSee('1/3')
+            ->assertSee('Câu đúng')
+            ->assertSee('Câu sai')
+            ->assertSee('Chưa trả lời');
+
+        $this->assertSame(3, substr_count($response->getContent(), 'Đáp án đúng'));
+        $this->assertSame(2, substr_count($response->getContent(), 'Bạn chọn'));
+    }
+
+    public function test_result_marks_the_selected_wrong_option_and_the_correct_option(): void
+    {
+        $attempt = $this->startAttempt();
+        $first = $this->exam->questions()->value('id');
+
+        $this->submit($attempt, ['answers' => [$first => $this->answers(false)[$first]]]);
+
+        $this->get("/attempts/{$attempt->id}")
+            ->assertSeeInOrder(['Sai 1', 'Bạn chọn', 'Đúng 1', 'Đáp án đúng']);
+    }
+
+    public function test_result_uses_the_snapshot_after_the_exam_changes(): void
+    {
+        $attempt = $this->startAttempt();
+
+        $this->submit($attempt, ['answers' => $this->answers(true)]);
+
+        Option::query()->update(['content' => 'Đã sửa', 'is_correct' => false]);
+        $this->exam->delete();
+
+        $this->get("/attempts/{$attempt->id}")
+            ->assertOk()
+            ->assertSee('3/3')
+            ->assertSeeInOrder(['Đúng 1', 'Đáp án đúng'])
+            ->assertDontSee('Đã sửa');
+    }
+
+    public function test_another_student_cannot_open_the_result(): void
+    {
+        $attempt = $this->startAttempt();
+
+        $this->submit($attempt, ['answers' => $this->answers(true)]);
+
+        $this->actingAs(User::factory()->create(['role' => 'student']))
+            ->get("/attempts/{$attempt->id}")
+            ->assertForbidden();
     }
 }
