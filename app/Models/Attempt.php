@@ -44,4 +44,12 @@ class Attempt extends Model
             'submitted_at' => 'datetime',
         ];
     }
+
+    /**
+     * Thời gian luôn so với đồng hồ server, không tin thời gian của client.
+     */
+    public function isExpired(): bool
+    {
+        return now()->greaterThan($this->deadline_at);
+    }
 }

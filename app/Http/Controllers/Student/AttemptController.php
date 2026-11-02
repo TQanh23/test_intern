@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SubmitAttemptRequest;
 use App\Models\Attempt;
 use App\Models\Exam;
 use App\Services\AttemptService;
@@ -24,5 +25,12 @@ class AttemptController extends Controller
     public function show(Attempt $attempt): View
     {
         return view('student.attempts.show', ['attempt' => $attempt]);
+    }
+
+    public function submit(SubmitAttemptRequest $request, Attempt $attempt): RedirectResponse
+    {
+        $this->attemptService->submit($attempt, $request->validated('answers', []));
+
+        return redirect()->route('attempts.show', $attempt)->with('status', 'Đã nộp bài.');
     }
 }

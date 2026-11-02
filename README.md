@@ -181,6 +181,13 @@ Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`
 - **`deadline_at` do server tính khi bắt đầu:** client không gửi lên, và snapshot có `is_correct` nhưng view không in ra.
 - **Chỉ trộn câu hỏi:** đề không yêu cầu trộn đáp án.
 
+### Nộp bài và chấm điểm
+
+- **Nộp quá giờ thì từ chối, không chấm:** đáp án chỉ được gửi lên lúc nộp, nên tin dữ liệu sau hạn là cho thêm giờ làm bài. Attempt giữ `in_progress`, không có điểm, nên không tính vào thống kê. Đổi lại, học sinh nộp trễ vài giây sẽ mất bài.
+- **Client chỉ gửi lựa chọn:** `score`, `is_correct`, `status` gửi lên bị bỏ qua. Đáp án phải thuộc đúng câu đó trong snapshot mới được tính.
+- **Chấm theo snapshot, không đọc MySQL:** admin sửa đề sau khi học sinh bắt đầu không làm đổi điểm.
+- **Ghi kết quả kèm điều kiện `status = in_progress`:** MongoDB xử lý một lần cập nhật một cách nguyên tử, nên hai request nộp cùng lúc chỉ có một request ghi được.
+
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
 Đề yêu cầu Laravel 11, nhưng nhánh 11.x không còn được vá nên Composer chặn cài đặt. Dự án khóa ở `^11.57` và chỉ bỏ qua đúng 5 mã cảnh báo trong `composer.json`, không tắt cơ chế chặn.
@@ -211,8 +218,9 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 8 | Collection MongoDB | Xong | |
 | 9 | Đăng ký, đăng nhập, phân quyền | Xong | Giao diện Breeze còn bằng tiếng Anh. |
 | 10 | CRUD đề thi và câu hỏi | Xong | Thông báo validate còn bằng tiếng Anh. |
-| 11 | Bắt đầu làm bài | Xong | Trang làm bài chưa nộp được, cần task 12. |
-| 12–14 | Tính năng chính | Chưa làm | |
+| 11 | Bắt đầu làm bài | Xong | |
+| 12 | Nộp bài và chấm điểm | Xong | Chưa có đồng hồ đếm ngược, trang chỉ hiện giờ hạn nộp. |
+| 13–14 | Tính năng chính | Chưa làm | |
 | 15–17 | Activity log, API, tổ chức code | Chưa làm | |
 | 18 | Feature test | Chưa làm | Mới có test mẫu của Laravel, test schema MySQL và test collection MongoDB. Chưa có test chấm điểm, nộp quá giờ. |
 | 19 | Bonus | Chưa làm | |
