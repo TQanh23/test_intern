@@ -9,22 +9,63 @@ use App\Models\Exam;
 use App\Models\Option;
 use App\Models\Question;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\UTCDateTime;
+use MongoDB\Driver\Exception\BulkWriteException;
 
 class AttemptService
 {
     /**
-     * Tạo lượt làm bài mới với câu hỏi đã trộn. Thời hạn do server tính.
+     * Trả về bài đang làm nếu còn hạn, nếu không thì tạo lượt mới với câu hỏi đã trộn. Thời hạn do server tính.
      */
     public function start(User $user, Exam $exam): Attempt
     {
+        $open = $this->findOpen($user, $exam);
+
+        if ($open && ! $open->isExpired()) {
+            return $open;
+        }
+
+        // Bài hết giờ bị bỏ dở: chấm theo đáp án đã lưu để đóng bài, rồi mới mở bài mới.
+        if ($open) {
+            $this->submit($open, []);
+        }
+
         $exam->load('questions.options');
 
         abort_if($exam->questions->isEmpty(), 422, 'Đề này chưa có câu hỏi.');
 
+        try {
+            $attempt = $this->create($user, $exam);
+        } catch (BulkWriteException $e) {
+            // 11000 là lỗi trùng unique index: một request khác vừa tạo bài cho đề này, dùng luôn bài đó.
+            if ($e->getCode() !== 11000) {
+                throw $e;
+            }
+
+            return $this->findOpen($user, $exam);
+        }
+
+        AttemptStarted::dispatch($attempt);
+
+        return $attempt;
+    }
+
+    private function findOpen(User $user, Exam $exam): ?Attempt
+    {
+        return Attempt::where('user_id', $user->id)
+            ->where('exam_id', $exam->id)
+            ->where('status', 'in_progress')
+            ->first();
+    }
+
+    private function create(User $user, Exam $exam): Attempt
+    {
         $startedAt = now();
 
-        $attempt = Attempt::create([
+        return Attempt::create([
             'user_id' => $user->id,
             'exam_id' => $exam->id,
             'exam_name' => $exam->name,
@@ -47,10 +88,61 @@ class AttemptService
                 'is_correct' => null,
             ])->all(),
         ]);
+    }
 
-        AttemptStarted::dispatch($attempt);
+    /**
+     * Chấm các bài đã hết giờ mà học sinh không quay lại nộp, theo đáp án đã lưu. Trả về số bài đã chấm.
+     */
+    public function closeExpired(): int
+    {
+        // shortcut: lấy hết vào bộ nhớ, đủ dùng vì command chạy mỗi phút nên mỗi lần chỉ có ít bài; nhiều bài thì đổi sang lazyById().
+        // Không dùng each(): each() phân trang theo offset, đổi status trong lúc lặp sẽ làm bỏ sót bài.
+        $expired = Attempt::where('status', 'in_progress')->where('deadline_at', '<', now())->get();
 
-        return $attempt;
+        $closed = 0;
+
+        foreach ($expired as $attempt) {
+            try {
+                $this->submit($attempt, []);
+                $closed++;
+            } catch (ValidationException) {
+                // Học sinh vừa tự nộp cùng lúc, bài đã được chấm.
+            }
+        }
+
+        return $closed;
+    }
+
+    /**
+     * Lưu đáp án của một câu ngay khi học sinh chọn. option_id null nghĩa là bỏ chọn.
+     */
+    public function saveAnswer(Attempt $attempt, int $questionId, ?int $optionId): void
+    {
+        $question = collect($attempt->questions)->firstWhere('question_id', $questionId);
+
+        if ($question === null) {
+            $this->reject('Câu hỏi không thuộc bài này.');
+        }
+
+        if ($optionId !== null && ! collect($question['options'])->contains('option_id', $optionId)) {
+            $this->reject('Đáp án không thuộc câu hỏi này.');
+        }
+
+        // Điều kiện status và deadline nằm trong cùng lệnh ghi, nên không ghi được vào bài đã nộp hoặc đã hết giờ.
+        // Dùng matchedCount vì chọn lại đúng đáp án cũ thì không có gì thay đổi (modifiedCount = 0).
+        $result = DB::connection('mongodb')->getCollection('attempts')->updateOne(
+            [
+                '_id' => new ObjectId($attempt->getKey()),
+                'status' => 'in_progress',
+                'deadline_at' => ['$gte' => new UTCDateTime(now())],
+                'questions.question_id' => $questionId,
+            ],
+            ['$set' => ['questions.$.selected_option_id' => $optionId]],
+        );
+
+        if ($result->getMatchedCount() === 0) {
+            $this->reject('Bài đã nộp hoặc đã hết giờ, không lưu được đáp án.');
+        }
     }
 
     /**
@@ -64,8 +156,9 @@ class AttemptService
             $this->reject('Bài này đã được nộp.');
         }
 
+        // Hết giờ thì không nhận đáp án gửi kèm, chấm theo các đáp án đã autosave.
         if ($attempt->isExpired()) {
-            $this->reject('Đã hết giờ làm bài.');
+            $answers = array_column($attempt->questions, 'selected_option_id', 'question_id');
         }
 
         $questions = array_map(

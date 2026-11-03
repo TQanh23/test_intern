@@ -93,14 +93,16 @@ class SubmitAttemptApiTest extends TestCase
             ->assertJsonValidationErrors(['attempt' => 'Bài này đã được nộp.']);
     }
 
-    public function test_expired_submit_returns_422(): void
+    public function test_expired_submit_grades_the_saved_answers_and_ignores_new_ones(): void
     {
         Sanctum::actingAs($this->student);
         $this->travel(31)->minutes();
 
-        $this->submit()
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['attempt' => 'Đã hết giờ làm bài.']);
+        // Attempt chưa autosave câu nào, nên đáp án đúng gửi kèm lúc quá giờ không được tính.
+        $this->submit(['answers' => $this->correctAnswers()])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'submitted')
+            ->assertJsonPath('data.score', 0);
     }
 
     public function test_invalid_answers_returns_422(): void

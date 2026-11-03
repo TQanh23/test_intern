@@ -20,6 +20,19 @@ services:
       retries: 5
       start_period: 10m
 
+  # Chạy lệnh định kỳ trong routes/console.php, ví dụ chấm bài hết giờ mà học sinh bỏ dở.
+  # Entrypoint chỉ cài dependency và migrate khi chạy php-fpm, nên container này đợi app sẵn sàng rồi dùng chung code và vendor.
+  scheduler:
+    build: ./docker/php
+    command: php artisan schedule:work
+    volumes:
+      - .:/var/www/html
+      - vendor:/var/www/html/vendor
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
   # Trang Breeze dùng @vite, mà public/build không nằm trong git nên phải build khi khởi động.
   assets:
     image: node:22-alpine

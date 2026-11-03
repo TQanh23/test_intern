@@ -2,7 +2,7 @@
 
 Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
-**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài, chấm điểm, trang kết quả, thống kê admin, activity log và API danh sách đề, nộp bài. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
+**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài có autosave, chấm điểm, trang kết quả, thống kê admin, activity log và API danh sách đề, nộp bài. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
 
 ## Chạy dự án
 
@@ -40,6 +40,7 @@ Seeder cũng tạo 2 đề: "Toán cơ bản" (15 phút, 5 câu) và "Tiếng An
 | Chạy test (cần container `mongo` đang chạy) | `docker compose exec app php artisan test` |
 | Kiểm tra định dạng code | `docker compose exec app ./vendor/bin/pint --test` |
 | Kiểm tra kết nối MySQL và MongoDB | `docker compose exec app php artisan app:check-connections` |
+| Chấm ngay các bài hết giờ bị bỏ dở (container `scheduler` cũng tự chạy mỗi phút) | `docker compose exec app php artisan app:close-expired-attempts` |
 | Chạy lệnh artisan | `docker compose exec app php artisan <lệnh>` |
 | Cài package PHP | `docker compose exec app composer require <package>` |
 | Chạy Vite (cần Node trên máy) | `npm install && npm run dev` |
@@ -124,7 +125,7 @@ erDiagram
 
 ### Collection MongoDB
 
-Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`. Index được tạo bằng migration, dùng `table()` thay vì `create()` vì `migrate:fresh` không xóa collection.
+Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`. `attempts` có thêm unique index một phần `one_open_attempt_per_exam`, xem mục [Autosave và tiếp tục bài](#autosave-và-tiếp-tục-bài). Index được tạo bằng migration, dùng `table()` thay vì `create()` vì `migrate:fresh` không xóa collection.
 
 `attempts`:
 
@@ -158,6 +159,7 @@ Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`
 - **Entrypoint tự chuẩn bị app:** chỉ cần `docker compose up`. Nginx chờ healthcheck của `app` nên không trả lỗi 502 trong lúc cài dependency.
 - **Service `assets` build frontend mỗi lần khởi động:** trang dùng `@vite`, mà `public/build` là file sinh ra nên không commit vào git. Thiếu bước này thì clone mới sẽ lỗi 500 ở `/login`. Đổi lại, mỗi lần khởi động lâu hơn một chút. `node_modules` nằm trong named volume cùng lý do với `vendor`.
 - **`vendor` nằm trong named volume, không bind mount:** trên Windows, bind mount khiến mỗi lệnh `artisan` mất khoảng 14 giây, dùng volume còn khoảng 0,4 giây. Đổi lại, `vendor` trên máy không tự cập nhật, nên IDE có thể chưa gợi ý code của package mới.
+- **Service `scheduler` chạy `php artisan schedule:work`:** gọi các lệnh định kỳ khai báo trong `routes/console.php`. Hiện chỉ có lệnh chấm bài bỏ dở, chạy mỗi phút. Service dùng chung image, code và `vendor` với `app`, và chỉ khởi động sau khi `app` healthy. Entrypoint chỉ cài dependency và migrate khi lệnh là `php-fpm`, nên container này không chạy lại các bước đó. Xem log bằng `docker compose logs scheduler`.
 - **MongoDB mở ra máy qua cổng `27018`:** tránh trùng với MongoDB cài sẵn trên máy, thường chiếm `27017`.
 - **MySQL và MongoDB chỉ bind vào `127.0.0.1`:** MongoDB không đặt mật khẩu nên không được mở ra mạng ngoài.
 
@@ -185,7 +187,7 @@ GitHub Actions chạy [.github/workflows/ci.yml](.github/workflows/ci.yml) cho m
 ### Bắt đầu làm bài
 
 - **Tạo attempt bằng POST rồi chuyển hướng sang GET:** tải lại trang không tạo thêm attempt.
-- **Bấm bắt đầu lại sẽ tạo attempt mới:** đúng yêu cầu mỗi lần làm có attempt riêng. Chưa chặn 2 attempt mở song song.
+- **Bấm bắt đầu khi đang có bài mở thì quay về bài đó:** mỗi lần làm vẫn có attempt riêng, nhưng chỉ được tạo bài mới sau khi bài cũ đã nộp hoặc hết giờ. Chi tiết ở mục [Autosave và tiếp tục bài](#autosave-và-tiếp-tục-bài).
 - **Admin không làm bài được:** middleware `student` trả 403, để điểm của admin không lọt vào thống kê.
 - **Quyền xem attempt nằm ở `AttemptPolicy`:** chỉ chủ attempt mở được, phải so theo từng bản ghi nên middleware không đủ.
 - **`deadline_at` do server tính khi bắt đầu:** client không gửi lên, và snapshot có `is_correct` nhưng view không in ra.
@@ -193,16 +195,32 @@ GitHub Actions chạy [.github/workflows/ci.yml](.github/workflows/ci.yml) cho m
 
 ### Nộp bài và chấm điểm
 
-- **Nộp quá giờ thì từ chối, không chấm:** đáp án chỉ được gửi lên lúc nộp, nên tin dữ liệu sau hạn là cho thêm giờ làm bài. Attempt giữ `in_progress`, không có điểm, nên không tính vào thống kê. Đổi lại, học sinh nộp trễ vài giây sẽ mất bài.
+- **Nộp quá giờ thì chấm theo các đáp án đã lưu:** đáp án gửi kèm sau hạn bị bỏ qua, vì nhận chúng là cho thêm giờ làm bài. Các câu đã autosave trước hạn vẫn được tính, nên trình duyệt tự nộp lúc hết giờ mà request đến trễ vài ms thì học sinh cũng không mất bài. Trước khi có autosave, bài nộp quá giờ bị từ chối hẳn.
 - **Client chỉ gửi lựa chọn:** `score`, `is_correct`, `status` gửi lên bị bỏ qua. Đáp án phải thuộc đúng câu đó trong snapshot mới được tính.
 - **Chấm theo snapshot, không đọc MySQL:** admin sửa đề sau khi học sinh bắt đầu không làm đổi điểm.
 - **Ghi kết quả kèm điều kiện `status = in_progress`:** MongoDB xử lý một lần cập nhật một cách nguyên tử, nên hai request nộp cùng lúc chỉ có một request ghi được.
+
+### Autosave và tiếp tục bài
+
+- **Lưu từng câu ngay khi chọn:** trang làm bài gọi `PATCH /attempts/{id}/answers` bằng axios mỗi khi chọn một đáp án, rồi hiện "Đã lưu" hoặc "Chưa lưu được". Đáp án được ghi vào `selected_option_id` trong snapshot, nên tải lại trang vẫn thấy các câu đã chọn.
+- **Ghi bằng một lệnh `updateOne` có điều kiện `status = in_progress` và `deadline_at >= now`:** không ghi được vào bài đã nộp hoặc đã hết giờ, kể cả khi request lưu và request nộp tới cùng lúc. Lệnh dùng `getMatchedCount()` thay cho số document đã thay đổi, vì chọn lại đúng đáp án cũ thì không có gì thay đổi nhưng vẫn là thành công.
+- **Đáp án phải thuộc đúng câu trong snapshot:** giống lúc chấm, client không ghi được `option_id` tùy ý.
+- **Mỗi student chỉ có 1 bài đang mở cho mỗi đề, do MongoDB chặn:** unique index một phần `one_open_attempt_per_exam` trên `(user_id, exam_id)`, chỉ áp dụng cho `status = in_progress`. Hai request "Bắt đầu" cùng lúc thì request sau gặp lỗi trùng khóa (mã 11000), và Service trả về bài mà request kia vừa tạo.
+- **Bài hết giờ bị bỏ dở được chấm theo đáp án đã lưu, ở 3 chỗ:**
+  - bấm "Bắt đầu" lại đề đó: bài cũ được chấm rồi mới tạo bài mới
+  - bấm "Chấm bài" trên trang làm bài
+  - lệnh `app:close-expired-attempts`, container `scheduler` chạy mỗi phút
+
+  Cả 3 chỗ đều gọi `AttemptService::submit()`, nên điểm tính giống hệt lúc tự nộp và vẫn có log `attempt.submitted`. Lệnh ghi có điều kiện `status = in_progress`, nên chạy trùng lúc với học sinh tự nộp cũng không chấm hai lần. Không chấm khi chỉ mở trang, vì request GET không nên ghi dữ liệu.
+- **Gửi các request lưu lần lượt:** trình duyệt chỉ gửi request lưu tiếp theo khi request trước đã xong. Nhờ vậy, khi đổi đáp án nhanh, request cũ đến muộn không ghi đè đáp án mới. Một request lỗi không chặn các request sau. Không đánh số thứ tự ở server, vì phải thêm trường vào snapshot và xử lý số thứ tự bị reset khi reload, trong khi chỉ còn sót trường hợp mở 2 tab cùng một bài.
+- **Đồng hồ đếm ngược từ số giây còn lại do server tính:** mỗi lần tải trang, server tính lại `deadline_at - now`, nên reload không reset đồng hồ và giờ máy client sai cũng không ảnh hưởng. JS tính theo mốc kết thúc mỗi giây, nên tab chạy nền bị chậm cũng không lệch. Về 0 thì form tự nộp.
+- **Không ghi activity log cho từng câu:** sẽ sinh quá nhiều log. `attempt.started` và `attempt.submitted` đã đủ.
 
 ### Trang kết quả
 
 - **Dùng lại trang `attempts.show`, không thêm route riêng:** route, policy và redirect sau khi nộp đã có sẵn, trang chỉ đổi nội dung theo `status`.
 - **Đọc từ snapshot, không đọc MySQL:** kết quả giữ nguyên khi admin sửa hoặc xóa đề, và không phát sinh query theo từng câu.
-- **Chỉ hiện đáp án khi `status = submitted`:** bài quá giờ vẫn là `in_progress` nên không hiện đáp án, vì học sinh có thể bắt đầu lại đề.
+- **Chỉ hiện đáp án khi `status = submitted`:** bài hết giờ mà chưa chấm thì trang chỉ có nút "Chấm bài", bấm vào sẽ chấm theo các đáp án đã lưu.
 
 ### Activity log
 
@@ -245,7 +263,7 @@ Xác thực bằng token Sanctum, gửi trong header `Authorization: Bearer <tok
 | Method | URL | Thành công | Lỗi |
 |---|---|---|---|
 | GET | `/api/exams` | 200: `data` (`id`, `name`, `duration_minutes`, `questions_count`), `links`, `meta`; 10 đề mỗi trang | 401, 403 |
-| POST | `/api/attempts/{id}/submit` | 200: `data` gồm điểm, `status`, giờ bắt đầu, hạn nộp, giờ nộp và `questions` đã chấm | 401; 403 nếu không phải bài của mình; 404; 422 nếu `answers` sai định dạng, bài đã nộp hoặc đã hết giờ |
+| POST | `/api/attempts/{id}/submit` | 200: `data` gồm điểm, `status`, giờ bắt đầu, hạn nộp, giờ nộp và `questions` đã chấm | 401; 403 nếu không phải bài của mình; 404; 422 nếu `answers` sai định dạng hoặc bài đã nộp. Nộp quá giờ vẫn trả 200, chấm theo các đáp án đã lưu |
 
 Body khi nộp bài giống form web: `{"answers": {"<question_id>": <option_id>}}`. Câu bỏ trống thì không gửi. Lỗi theo format mặc định của Laravel: luôn có `message`, riêng 422 có thêm `errors`.
 
@@ -298,7 +316,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 9 | Đăng ký, đăng nhập, phân quyền | Xong | Giao diện Breeze còn bằng tiếng Anh. |
 | 10 | CRUD đề thi và câu hỏi | Xong | Thông báo validate còn bằng tiếng Anh. |
 | 11 | Bắt đầu làm bài | Xong | |
-| 12 | Nộp bài và chấm điểm | Xong | Chưa có đồng hồ đếm ngược, trang chỉ hiện giờ hạn nộp. |
+| 12 | Nộp bài và chấm điểm | Xong | |
 | 13 | Trang kết quả | Xong | Chưa có lịch sử làm bài, rời trang rồi chỉ mở lại được kết quả qua URL. |
 | 14 | Thống kê admin | Xong | Chưa có cache, mỗi lần mở trang chạy 3 aggregation. Chưa lọc theo thời gian. |
 | 15 | Activity log | Xong | Chưa có trang xem log, chỉ xem được trong MongoDB. Chưa ghi thao tác với câu hỏi. |
@@ -306,12 +324,15 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 17 | Tổ chức code | Chưa làm | |
 | 18 | Feature test | Một phần | Đã có test chấm điểm và nộp quá giờ. Các tính năng chưa làm chưa có test. |
 | 19 | Bonus | Chưa làm | |
-| 20–22 | Nâng cao | Chưa làm | Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
+| 20 | Autosave và tiếp tục bài | Xong | Chỉ có trên web, API chưa có autosave. Mất mạng lúc chọn đáp án thì chỉ báo "Chưa lưu được", không tự gửi lại. Bài bỏ dở được chấm trễ tối đa khoảng 1 phút. |
+| 21–22 | Gói IELTS | Chưa làm | Đề yêu cầu làm ít nhất 1 trong 3 task 20–22, đã chọn task 20. Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
 
 Các hạn chế khác:
 
 - **MongoDB lỗi thì đăng nhập cũng lỗi:** log được ghi đồng bộ trong cùng request. Khi đó làm bài cũng không được, vì `attempts` cũng nằm trong MongoDB.
 - **Seed cũng sinh log:** lần seed đầu ghi 2 log `exam.created` có `user_id` để trống, vì đề mẫu không do admin nào tạo.
+- **Bài bỏ dở được chấm trễ tối đa khoảng 1 phút:** trong khoảng đó bài vẫn là `in_progress` và chưa có trong thống kê. Nếu container `scheduler` không chạy thì bài chỉ được chấm khi học sinh quay lại.
+- **Mở 2 tab cùng một bài rồi đổi đáp án ở cả hai:** mỗi tab có hàng đợi lưu riêng, nên đáp án cuối cùng là của request đến server sau cùng, không chắc là lần chọn sau cùng.
 - **Xem đáp án rồi làm lại được điểm tối đa:** đề không giới hạn số lần làm, nên học sinh có thể nộp một lần để xem đáp án rồi bắt đầu lại.
 - **Seed không khôi phục dữ liệu đã sửa:** chạy lại `php artisan migrate --seed` không lỗi, nhưng tài khoản hoặc đề đã có sẽ được bỏ qua. Dùng `php artisan migrate:fresh --seed` để đưa MySQL về dữ liệu mẫu ban đầu, lệnh này xóa toàn bộ dữ liệu MySQL hiện có.
 - **Test chạy bằng SQLite in-memory và database MongoDB riêng `exam_testing`:** nhờ vậy test không đụng dữ liệu dev, nhưng không phát hiện được lỗi truy vấn riêng của MySQL. CI chỉ chạy migrate và seed trên MySQL thật. Test cần container `mongo` đang chạy.

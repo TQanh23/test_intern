@@ -145,20 +145,27 @@ class SubmitAttemptTest extends TestCase
         $this->assertNull(collect($attempt->questions)->firstWhere('question_id', $first)['selected_option_id']);
     }
 
-    public function test_submitting_after_the_deadline_is_rejected(): void
+    public function test_submitting_after_the_deadline_grades_the_saved_answers(): void
     {
         $attempt = $this->startAttempt();
+        $first = $this->exam->questions()->orderBy('id')->value('id');
+
+        $this->actingAs($this->student)->patchJson("/attempts/{$attempt->id}/answers", [
+            'question_id' => $first,
+            'option_id' => $this->answers(true)[$first],
+        ])->assertNoContent();
 
         $this->travelTo($attempt->deadline_at->copy()->addSecond());
 
+        // Đáp án gửi kèm lúc quá giờ bị bỏ qua, chỉ câu đã lưu trước hạn được tính.
         $this->submit($attempt, ['answers' => $this->answers(true)])
-            ->assertSessionHasErrors('attempt');
+            ->assertSessionHasNoErrors();
 
         $attempt->refresh();
 
-        $this->assertSame('in_progress', $attempt->status);
-        $this->assertNull($attempt->score);
-        $this->assertNull($attempt->submitted_at);
+        $this->assertSame('submitted', $attempt->status);
+        $this->assertSame(1, $attempt->score);
+        $this->assertSame(3, $attempt->total);
     }
 
     public function test_submitting_exactly_at_the_deadline_is_accepted(): void
@@ -258,7 +265,7 @@ class SubmitAttemptTest extends TestCase
             ->assertDontSee('Nộp bài');
     }
 
-    public function test_page_shows_a_message_and_no_form_when_time_is_up(): void
+    public function test_page_shows_only_a_grade_button_when_time_is_up(): void
     {
         $attempt = $this->startAttempt();
 
@@ -267,6 +274,8 @@ class SubmitAttemptTest extends TestCase
         $this->get("/attempts/{$attempt->id}")
             ->assertOk()
             ->assertSee('Đã hết giờ')
+            ->assertSee('Chấm bài')
+            ->assertDontSee('type="radio"', false)
             ->assertDontSee('Nộp bài')
             ->assertDontSee('Đúng 1')
             ->assertDontSee('Đáp án đúng');
