@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Events\AttemptStarted;
+use App\Events\AttemptSubmitted;
 use App\Models\Attempt;
 use App\Models\Exam;
 use App\Models\Option;
@@ -22,7 +24,7 @@ class AttemptService
 
         $startedAt = now();
 
-        return Attempt::create([
+        $attempt = Attempt::create([
             'user_id' => $user->id,
             'exam_id' => $exam->id,
             'exam_name' => $exam->name,
@@ -45,6 +47,10 @@ class AttemptService
                 'is_correct' => null,
             ])->all(),
         ]);
+
+        AttemptStarted::dispatch($attempt);
+
+        return $attempt;
     }
 
     /**
@@ -81,6 +87,9 @@ class AttemptService
         if ($updated === 0) {
             $this->reject('Bài này đã được nộp.');
         }
+
+        // Đọc lại để event mang điểm vừa lưu. Lệnh update ở trên không phát model event.
+        AttemptSubmitted::dispatch($attempt->fresh());
     }
 
     /**
