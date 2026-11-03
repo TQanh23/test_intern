@@ -2,7 +2,7 @@
 
 Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
-**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài, chấm điểm và trang kết quả. Chưa có thống kê, activity log và API. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
+**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài, chấm điểm và trang kết quả. Đã có activity log. Chưa có thống kê và API. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
 
 ## Chạy dự án
 
@@ -60,7 +60,7 @@ Các thông tin trên chỉ dùng cho môi trường dev.
 
 ### Dữ liệu nào để MySQL, dữ liệu nào để MongoDB
 
-Schema MySQL đã có migration. Hai collection MongoDB đã có Model và index, nhưng chưa có tính năng nào ghi dữ liệu vào đó.
+Schema MySQL đã có migration. Hai collection MongoDB đã có Model và index. `attempts` được ghi khi làm bài, `activity_logs` được ghi qua Event/Observer.
 
 | Nơi lưu | Dữ liệu | Lý do |
 |---|---|---|
@@ -203,6 +203,24 @@ GitHub Actions chạy [.github/workflows/ci.yml](.github/workflows/ci.yml) cho m
 - **Đọc từ snapshot, không đọc MySQL:** kết quả giữ nguyên khi admin sửa hoặc xóa đề, và không phát sinh query theo từng câu.
 - **Chỉ hiện đáp án khi `status = submitted`:** bài quá giờ vẫn là `in_progress` nên không hiện đáp án, vì học sinh có thể bắt đầu lại đề.
 
+### Activity log
+
+Không controller nào ghi log. Mọi log đi qua [RecordActivity](app/Listeners/RecordActivity.php) hoặc [ExamObserver](app/Observers/ExamObserver.php).
+
+| `action` | Nguồn | `details` |
+|---|---|---|
+| `auth.login`, `auth.logout` | Event `Login`, `Logout` có sẵn của Laravel | |
+| `attempt.started` | Event `AttemptStarted`, phát trong `AttemptService::start()` | `attempt_id` |
+| `attempt.submitted` | Event `AttemptSubmitted`, phát trong `AttemptService::submit()` | `attempt_id`, `score`, `total` |
+| `exam.created`, `exam.updated`, `exam.deleted` | `ExamObserver` | `name`, riêng `updated` có thêm `changes` |
+
+- **Bài làm dùng Event, không dùng Observer trên `Attempt`:** lúc nộp bài, code cập nhật bằng query có điều kiện `status = in_progress` để chống nộp hai lần. Lệnh update kiểu này không phát model event, nên Observer không bắt được.
+- **Đề thi dùng Observer:** admin controller gọi thẳng `Exam::create`, `update`, `delete`, nên model event tự phát mà không phải sửa controller.
+- **Event phát trong Service:** API nộp bài sau này gọi lại `AttemptService` nên tự có log.
+- **Listener chạy đồng bộ:** dự án chưa có queue worker. Thêm worker chỉ để ghi log thì phức tạp hơn mức cần.
+- **Không ghi `Registered`:** đăng ký xong Laravel tự đăng nhập luôn, nên đã có log `auth.login`.
+- **Chưa ghi thao tác với câu hỏi:** chỉ ghi ở cấp đề thi. Muốn ghi thì thêm `QuestionObserver` theo cùng cách.
+
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
 Đề yêu cầu Laravel 11, nhưng nhánh 11.x không còn được vá nên Composer chặn cài đặt. Dự án khóa ở `^11.57` và chỉ bỏ qua đúng 5 mã cảnh báo trong `composer.json`, không tắt cơ chế chặn.
@@ -237,13 +255,16 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 12 | Nộp bài và chấm điểm | Xong | Chưa có đồng hồ đếm ngược, trang chỉ hiện giờ hạn nộp. |
 | 13 | Trang kết quả | Xong | Chưa có lịch sử làm bài, rời trang rồi chỉ mở lại được kết quả qua URL. |
 | 14 | Thống kê admin | Chưa làm | |
-| 15–17 | Activity log, API, tổ chức code | Chưa làm | |
+| 15 | Activity log | Xong | Chưa có trang xem log, chỉ xem được trong MongoDB. Chưa ghi thao tác với câu hỏi. |
+| 16–17 | API, tổ chức code | Chưa làm | |
 | 18 | Feature test | Một phần | Đã có test chấm điểm và nộp quá giờ. Các tính năng chưa làm chưa có test. |
 | 19 | Bonus | Chưa làm | |
 | 20–22 | Nâng cao | Chưa làm | Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
 
 Các hạn chế khác:
 
+- **MongoDB lỗi thì đăng nhập cũng lỗi:** log được ghi đồng bộ trong cùng request. Khi đó làm bài cũng không được, vì `attempts` cũng nằm trong MongoDB.
+- **Seed cũng sinh log:** lần seed đầu ghi 2 log `exam.created` có `user_id` để trống, vì đề mẫu không do admin nào tạo.
 - **Xem đáp án rồi làm lại được điểm tối đa:** đề không giới hạn số lần làm, nên học sinh có thể nộp một lần để xem đáp án rồi bắt đầu lại.
 - **Seed không khôi phục dữ liệu đã sửa:** chạy lại `php artisan migrate --seed` không lỗi, nhưng tài khoản hoặc đề đã có sẽ được bỏ qua. Dùng `php artisan migrate:fresh --seed` để đưa MySQL về dữ liệu mẫu ban đầu, lệnh này xóa toàn bộ dữ liệu MySQL hiện có.
 - **Test chạy bằng SQLite in-memory và database MongoDB riêng `exam_testing`:** nhờ vậy test không đụng dữ liệu dev, nhưng không phát hiện được lỗi truy vấn riêng của MySQL. CI chỉ chạy migrate và seed trên MySQL thật. Test cần container `mongo` đang chạy.
