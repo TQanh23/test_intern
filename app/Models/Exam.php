@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Observers\ExamListCacheObserver;
 use App\Observers\ExamObserver;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[ObservedBy(ExamObserver::class)]
+#[ObservedBy([ExamObserver::class, ExamListCacheObserver::class])]
 class Exam extends Model
 {
     /**

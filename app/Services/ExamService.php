@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Exam;
 use App\Models\Question;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ExamService
@@ -24,16 +26,33 @@ class ExamService
     }
 
     /**
-     * Danh sách đề cho student, bỏ các đề chưa có câu hỏi.
+     * Số phiên bản của cache danh sách đề. Tăng số này thì mọi trang đã cache đều không còn được đọc.
+     */
+    private const VERSION_KEY = 'exams.available.version';
+
+    /**
+     * Danh sách đề cho student, bỏ các đề chưa có câu hỏi. Web và API cùng dùng, cache 10 phút cho mỗi trang.
      *
      * @return LengthAwarePaginator<int, Exam>
      */
     public function paginateAvailable(): LengthAwarePaginator
     {
-        return Exam::has('questions')
+        $key = 'exams.available.v'.Cache::get(self::VERSION_KEY, 0).'.page.'.Paginator::resolveCurrentPage();
+
+        return Cache::remember($key, now()->addMinutes(10), fn () => Exam::has('questions')
             ->withCount('questions')
             ->latest('id')
-            ->paginate(10);
+            ->paginate(10))
+            // Paginator giữ đường dẫn lúc được tạo: trang cache từ /exams phải đổi link sang /api/exams khi API gọi.
+            ->withPath(Paginator::resolveCurrentPath());
+    }
+
+    /**
+     * Gọi từ ExamListCacheObserver khi đề hoặc câu hỏi thay đổi.
+     */
+    public static function forgetAvailableCache(): void
+    {
+        Cache::forever(self::VERSION_KEY, Cache::get(self::VERSION_KEY, 0) + 1);
     }
 
     /**
