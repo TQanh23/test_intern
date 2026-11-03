@@ -94,13 +94,6 @@ class ActivityLogTest extends TestCase
         $this->submit($submitted);
 
         $this->assertSame(1, ActivityLog::where('action', 'attempt.submitted')->count());
-
-        Attempt::truncate();
-        $expired = $this->startAttempt();
-        $this->travel(31)->minutes();
-        $this->submit($expired);
-
-        $this->assertSame(1, ActivityLog::where('action', 'attempt.submitted')->count());
     }
 
     public function test_admin_exam_create_update_delete_are_logged(): void

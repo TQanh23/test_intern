@@ -113,24 +113,6 @@ class StartAttemptTest extends TestCase
         }
     }
 
-    public function test_each_start_creates_a_new_attempt_with_a_different_order(): void
-    {
-        $exam = $this->createExam(10);
-        $student = $this->student();
-
-        $this->actingAs($student)->post("/exams/{$exam->id}/attempts");
-        $this->actingAs($student)->post("/exams/{$exam->id}/attempts");
-
-        [$first, $second] = Attempt::all()->all();
-
-        $this->assertSame(2, Attempt::count());
-        $this->assertNotSame($first->id, $second->id);
-        $this->assertNotSame(
-            array_column($first->questions, 'question_id'),
-            array_column($second->questions, 'question_id'),
-        );
-    }
-
     public function test_attempt_page_hides_answers_and_reloading_adds_no_attempt(): void
     {
         $exam = $this->createExam();

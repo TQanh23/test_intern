@@ -52,4 +52,12 @@ class Attempt extends Model
     {
         return now()->greaterThan($this->deadline_at);
     }
+
+    /**
+     * Số giây còn lại theo đồng hồ server. Trang làm bài đếm ngược từ số này nên reload không làm reset đồng hồ.
+     */
+    public function remainingSeconds(): int
+    {
+        return max(0, $this->deadline_at->getTimestamp() - now()->getTimestamp());
+    }
 }

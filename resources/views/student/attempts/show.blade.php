@@ -48,12 +48,54 @@
                     </div>
                 @endforeach
             @elseif ($attempt->isExpired())
-                <div class="bg-white shadow-sm sm:rounded-lg p-6">
-                    <p class="text-gray-900">Đã hết giờ làm bài. Bài này không được chấm điểm.</p>
+                <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
+                    <p class="text-gray-900">Đã hết giờ làm bài. Bài sẽ được chấm theo các đáp án đã lưu.</p>
+                    <form method="POST" action="{{ route('attempts.submit', $attempt) }}">
+                        @csrf
+                        <x-primary-button>Chấm bài</x-primary-button>
+                    </form>
                 </div>
             @else
-                <form method="POST" action="{{ route('attempts.submit', $attempt) }}" class="space-y-6">
+                @php($remaining = $attempt->remainingSeconds())
+
+                {{-- Đếm ngược từ số giây còn lại do server tính, nên giờ máy client sai cũng không ảnh hưởng. --}}
+                <form method="POST" action="{{ route('attempts.submit', $attempt) }}" class="space-y-6"
+                    x-data="{
+                        left: {{ $remaining }},
+                        end: 0,
+                        status: '',
+                        init() {
+                            // Tính lại theo mốc kết thúc mỗi giây, nên tab chạy nền bị chậm cũng không lệch giờ.
+                            this.end = Date.now() + this.left * 1000;
+                            const timer = setInterval(() => {
+                                this.left = Math.max(0, Math.ceil((this.end - Date.now()) / 1000));
+                                if (this.left === 0) {
+                                    clearInterval(timer);
+                                    this.$el.submit();
+                                }
+                            }, 1000);
+                        },
+                        clock() {
+                            return Math.floor(this.left / 60) + ':' + String(this.left % 60).padStart(2, '0');
+                        },
+                        queue: Promise.resolve(),
+                        save(questionId, optionId) {
+                            this.status = 'Đang lưu...';
+                            // Gửi lần lượt: request sau chờ request trước xong, để request cũ đến muộn không ghi đè đáp án mới.
+                            this.queue = this.queue
+                                .then(() => axios.patch('{{ route('attempts.answers', $attempt) }}', { question_id: questionId, option_id: optionId }))
+                                .then(() => this.status = 'Đã lưu')
+                                .catch(() => this.status = 'Chưa lưu được, hãy chọn lại đáp án.');
+                        },
+                    }">
                     @csrf
+
+                    <div class="sticky top-0 z-10 bg-white shadow-sm sm:rounded-lg px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-gray-900">
+                            Còn lại: <span class="font-semibold tabular-nums" x-text="clock()">{{ sprintf('%d:%02d', intdiv($remaining, 60), $remaining % 60) }}</span>
+                        </p>
+                        <p class="text-sm text-gray-600" aria-live="polite" x-text="status"></p>
+                    </div>
 
                     @foreach ($attempt->questions as $question)
                         <fieldset class="bg-white shadow-sm sm:rounded-lg p-6">
@@ -63,7 +105,9 @@
                             <div class="mt-4 space-y-2">
                                 @foreach ($question['options'] as $option)
                                     <label class="flex items-center gap-3 text-gray-700">
-                                        <input type="radio" name="answers[{{ $question['question_id'] }}]" value="{{ $option['option_id'] }}" class="border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                        <input type="radio" name="answers[{{ $question['question_id'] }}]" value="{{ $option['option_id'] }}" @checked($option['option_id'] === $question['selected_option_id'])
+                                            @change="save({{ $question['question_id'] }}, {{ $option['option_id'] }})"
+                                            class="border-gray-300 text-indigo-600 focus:ring-indigo-500">
                                         <span>{{ $option['content'] }}</span>
                                     </label>
                                 @endforeach
