@@ -23,6 +23,25 @@ class ExamManagementTest extends TestCase
         return Exam::create(['name' => $name, 'duration_minutes' => 30]);
     }
 
+    /**
+     * AppServiceProvider bật preventLazyLoading, nên nếu controller quên eager load thì trang sẽ throw.
+     * Cần từ 2 câu trở lên, vì Laravel không chặn lazy loading trên một model đơn lẻ.
+     */
+    public function test_exam_edit_page_eager_loads_questions_and_options(): void
+    {
+        $exam = $this->createExam();
+
+        foreach (range(1, 3) as $number) {
+            $question = $exam->questions()->create(['content' => "Câu {$number}"]);
+            $question->options()->create(['content' => "Đúng {$number}", 'is_correct' => true]);
+            $question->options()->create(['content' => "Sai {$number}", 'is_correct' => false]);
+        }
+
+        $this->actingAs($this->admin())->get("/admin/exams/{$exam->id}/edit")
+            ->assertOk()
+            ->assertSeeInOrder(['Đúng 1', 'Sai 1', 'Đúng 2', 'Sai 2', 'Đúng 3', 'Sai 3']);
+    }
+
     public function test_admin_can_open_exam_forms(): void
     {
         $exam = $this->createExam('Toán cơ bản');

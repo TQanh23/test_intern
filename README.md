@@ -2,7 +2,7 @@
 
 Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
-**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài có autosave, chấm điểm, trang kết quả, thống kê admin, activity log và API danh sách đề, nộp bài. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
+**Trạng thái hiện tại:** đã xong task 1–20, gồm cả bonus (task 19) và task nâng cao 20 (autosave). Không làm task 21–22 vì đề chỉ yêu cầu 1 trong 3 task nâng cao. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
 
 ## Chạy dự án
 
@@ -308,6 +308,46 @@ Request nộp bài sẽ nộp thật attempt đó. Trên Windows Git Bash, thay 
 - **Gọi `withPath()` sau khi lấy từ cache:** paginator giữ đường dẫn lúc được tạo. Nếu trang được cache từ `/exams` thì `links` của API sẽ trỏ về web.
 - **Với store `database`, một lần đọc từ cache tốn 2 query theo khóa chính trên bảng `cache`:** một lấy số phiên bản, một lấy trang. Thay cho query đếm và query `has` kèm `withCount` trên bảng đề.
 
+### Tổ chức code
+
+Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặc Resource.
+
+| Việc | Nơi đặt | Ví dụ |
+|---|---|---|
+| Logic nghiệp vụ | `app/Services` | `AttemptService` (bắt đầu bài, autosave, chấm điểm, chấm bài bỏ dở), `ExamService` (danh sách đề có cache, tạo và sửa câu hỏi), `StatisticsService` |
+| Validate | FormRequest | `ExamRequest`, `QuestionRequest`, `SubmitAttemptRequest`, `SaveAnswerRequest` |
+| Response API | API Resource | `ExamResource`, `AttemptResource` |
+| Phân quyền | Middleware, Policy | `admin`, `student`, `AttemptPolicy` |
+| Ghi log, xóa cache | Event/Listener, Observer | `RecordActivity`, `ExamObserver`, `ExamListCacheObserver` |
+| Lệnh định kỳ | Command, chỉ gọi Service | `app:close-expired-attempts` |
+
+- **Chặn N+1 bằng `Model::preventLazyLoading()`:** khai báo trong `AppServiceProvider`. Ở dev và test, nếu một danh sách model truy cập relation chưa được eager load thì Laravel throw ngay. Vì vậy toàn bộ test cũng kiểm tra luôn việc eager loading, kể cả cho code thêm sau này. Production tắt chế độ này để một chỗ bị sót chỉ làm trang chậm hơn, không thành lỗi 500. Test `test_exam_edit_page_eager_loads_questions_and_options` sẽ fail nếu bỏ `load('questions.options')`.
+- **Các chỗ eager loading:**
+  - trang sửa đề: `load('questions.options')`
+  - trang sửa câu hỏi: `load('options')`
+  - danh sách đề: `withCount('questions')`, không đếm theo từng đề
+  - thống kê: một query `whereIn` lấy tên cho cả 10 học sinh
+
+  Trang làm bài và trang kết quả chỉ đọc snapshot trong một document MongoDB, không có relation nào.
+- **`Admin\ExamController` vẫn gọi thẳng `Exam::create`, `update`, `delete`:** mỗi chỗ chỉ là một lệnh Eloquent với dữ liệu đã validate, không có logic. Bọc vào Service chỉ thêm một lớp chuyển tiếp mà không thêm hành vi. `createQuestion` và `updateQuestion` nằm trong Service vì cần transaction và tạo lại đáp án. Log và xóa cache của đề do Observer xử lý, nên controller không phải gọi thêm gì.
+
+### Feature test
+
+`docker compose exec app php artisan test` chạy toàn bộ test. CI cũng chạy lại mỗi lần push và mỗi pull request. Hiện có 142 test, tất cả đều pass.
+
+| File | Kiểm tra |
+|---|---|
+| `Student/SubmitAttemptTest` | **Chấm điểm:** đúng hết, sai và bỏ trống, đáp án của câu khác không được tính, client gửi điểm giả, chấm theo snapshot dù admin đã sửa đề. **Nộp quá giờ:** chấm theo đáp án đã lưu, bỏ qua đáp án gửi kèm; nộp đúng lúc hết hạn vẫn được nhận. Nộp 2 lần, nộp cùng lúc, trang kết quả |
+| `Student/AutosaveTest` | Lưu từng câu, đáp án không thuộc câu đó, lưu sau hạn hoặc sau khi nộp, 1 bài mở mỗi đề, 2 request bắt đầu cùng lúc, đồng hồ theo server |
+| `Student/StartAttemptTest` | Tạo attempt, snapshot đầy đủ, ẩn đáp án, quyền xem |
+| `CloseExpiredAttemptsTest` | Command chấm bài bỏ dở, lịch chạy mỗi phút |
+| `Api/ExamApiTest`, `Api/SubmitAttemptApiTest` | Format response và status code 200, 401, 403, 404, 422 |
+| `Admin/ExamManagementTest`, `Admin/QuestionManagementTest` | CRUD, tìm kiếm, phân trang, validate, eager loading |
+| `Admin/StatisticsTest` | 3 số liệu thống kê với dữ liệu biết trước điểm |
+| `ActivityLogTest`, `ExamListCacheTest` | Log qua Event/Observer, cache và xóa cache |
+| `AdminAccessTest`, `Auth/*` | Phân quyền admin/student, các luồng đăng nhập của Breeze |
+| `MongoCollectionsTest`, `ExamSchemaTest`, `DatabaseSeederTest`, `CheckConnectionsTest` | Index, schema, seed, command kiểm tra kết nối |
+
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
 Đề yêu cầu Laravel 11, nhưng nhánh 11.x không còn được vá nên Composer chặn cài đặt. Dự án khóa ở `^11.57` và chỉ bỏ qua đúng 5 mã cảnh báo trong `composer.json`, không tắt cơ chế chặn.
@@ -324,7 +364,7 @@ Khi triển khai thật cần nâng lên Laravel 12.69+ hoặc 13.30+.
 
 ## Những gì chưa làm được và vì sao
 
-Lý do chung: bài đang được làm theo thứ tự, phần setup làm trước nên các task sau chưa bắt đầu.
+Mọi task bắt buộc đều đã xong. Cột "Còn thiếu" ghi những phần có thể làm thêm nhưng đề không yêu cầu.
 
 | Task | Nội dung | Trạng thái | Còn thiếu |
 |---|---|---|---|
@@ -333,7 +373,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 3 | Kết nối MySQL | Xong | |
 | 4 | Kết nối MongoDB | Xong | |
 | 5 | `app:check-connections` | Xong | |
-| 6 | README | Xong | Cần cập nhật khi các task sau hoàn thành. |
+| 6 | README | Xong | |
 | 7 | Schema MySQL | Xong | |
 | 8 | Collection MongoDB | Xong | |
 | 9 | Đăng ký, đăng nhập, phân quyền | Xong | Giao diện Breeze còn bằng tiếng Anh. |
@@ -341,11 +381,11 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 11 | Bắt đầu làm bài | Xong | |
 | 12 | Nộp bài và chấm điểm | Xong | |
 | 13 | Trang kết quả | Xong | Chưa có lịch sử làm bài, rời trang rồi chỉ mở lại được kết quả qua URL. |
-| 14 | Thống kê admin | Xong | Chưa có cache, mỗi lần mở trang chạy 3 aggregation. Chưa lọc theo thời gian. |
+| 14 | Thống kê admin | Xong | Chưa cache trang thống kê (task 19 chỉ cache danh sách đề), mỗi lần mở trang chạy 3 aggregation. Chưa lọc theo thời gian. |
 | 15 | Activity log | Xong | Chưa có trang xem log, chỉ xem được trong MongoDB. Chưa ghi thao tác với câu hỏi. |
 | 16 | API REST | Xong | Chưa có endpoint đăng nhập và bắt đầu bài, phải tạo token bằng tinker và bắt đầu bài trên web. |
-| 17 | Tổ chức code | Chưa làm | |
-| 18 | Feature test | Một phần | Đã có test chấm điểm và nộp quá giờ. Các tính năng chưa làm chưa có test. |
+| 17 | Tổ chức code | Xong | |
+| 18 | Feature test | Xong | Test giao diện chỉ kiểm tra HTML trả về. Phần JS (autosave, đồng hồ) chưa có test trên trình duyệt. |
 | 19 | Bonus | Xong | Đã làm cache danh sách đề và Postman collection. Không làm Swagger. |
 | 20 | Autosave và tiếp tục bài | Xong | Chỉ có trên web, API chưa có autosave. Mất mạng lúc chọn đáp án thì chỉ báo "Chưa lưu được", không tự gửi lại. Bài bỏ dở được chấm trễ tối đa khoảng 1 phút. |
 | 21–22 | Gói IELTS | Chưa làm | Đề yêu cầu làm ít nhất 1 trong 3 task 20–22, đã chọn task 20. Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
