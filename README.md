@@ -285,6 +285,29 @@ curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/js
 - **`AttemptResource` chỉ trả `questions` khi bài đã nộp:** snapshot chứa đáp án đúng. Sau này có thêm endpoint xem bài đang làm thì đáp án cũng không bị lộ.
 - **Token Sanctum không hết hạn:** giữ mặc định của Sanctum (`expiration = null`). Thu hồi bằng cách xóa dòng tương ứng trong `personal_access_tokens`.
 
+#### Postman collection
+
+File [docs/postman/exam-api.postman_collection.json](docs/postman/exam-api.postman_collection.json) có 4 request: lấy danh sách đề, lấy danh sách khi không có token (401), nộp bài (200), nộp lại (422). Mỗi request có test kiểm tra status code và format JSON.
+
+- **Dùng trong Postman:** Import file, điền biến `token` và `attempt_id` của collection (cách lấy như các bước ở trên), rồi chạy lần lượt từ trên xuống.
+- **Chạy tự động bằng newman,** không cần cài gì trên máy:
+
+```bash
+docker run --rm --network test_intern_default -v "$PWD/docs/postman:/etc/newman" postman/newman:6-alpine run exam-api.postman_collection.json --env-var base_url=http://nginx --env-var token=<token> --env-var attempt_id=<id>
+```
+
+Request nộp bài sẽ nộp thật attempt đó. Trên Windows Git Bash, thay `$PWD` bằng `$(pwd -W)` và đặt `MSYS_NO_PATHCONV=1` trước lệnh.
+
+### Cache danh sách đề
+
+`ExamService::paginateAvailable()` cache mỗi trang trong 10 phút. Web `/exams` và API `/api/exams` cùng dùng hàm này nên cùng được cache.
+
+- **Xóa cache bằng số phiên bản:** key có dạng `exams.available.v<số phiên bản>.page.<trang>`. Khi đề hoặc câu hỏi thay đổi, [ExamListCacheObserver](app/Observers/ExamListCacheObserver.php) tăng số phiên bản, nên mọi trang cũ không còn được đọc nữa và tự hết hạn sau đó. Không xóa từng key vì không biết có bao nhiêu trang đã được cache. Cache store `database` không hỗ trợ tags, còn `Cache::flush()` thì xóa cả dữ liệu của rate limiter.
+- **Observer gắn vào cả `Exam` và `Question`:** đổi tên đề, thêm câu hỏi vào đề trống, xóa câu cuối cùng đều làm danh sách thay đổi. Observer tách riêng khỏi `ExamObserver`, vì `ExamObserver` chỉ để ghi log.
+- **Vẫn đặt TTL 10 phút:** nếu dữ liệu bị sửa ngoài Eloquent (sửa thẳng trong DB, hoặc xóa hàng loạt không qua model) thì danh sách cũng không sai quá 10 phút.
+- **Gọi `withPath()` sau khi lấy từ cache:** paginator giữ đường dẫn lúc được tạo. Nếu trang được cache từ `/exams` thì `links` của API sẽ trỏ về web.
+- **Với store `database`, một lần đọc từ cache tốn 2 query theo khóa chính trên bảng `cache`:** một lấy số phiên bản, một lấy trang. Thay cho query đếm và query `has` kèm `withCount` trên bảng đề.
+
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
 Đề yêu cầu Laravel 11, nhưng nhánh 11.x không còn được vá nên Composer chặn cài đặt. Dự án khóa ở `^11.57` và chỉ bỏ qua đúng 5 mã cảnh báo trong `composer.json`, không tắt cơ chế chặn.
@@ -323,7 +346,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 16 | API REST | Xong | Chưa có endpoint đăng nhập và bắt đầu bài, phải tạo token bằng tinker và bắt đầu bài trên web. |
 | 17 | Tổ chức code | Chưa làm | |
 | 18 | Feature test | Một phần | Đã có test chấm điểm và nộp quá giờ. Các tính năng chưa làm chưa có test. |
-| 19 | Bonus | Chưa làm | |
+| 19 | Bonus | Xong | Đã làm cache danh sách đề và Postman collection. Không làm Swagger. |
 | 20 | Autosave và tiếp tục bài | Xong | Chỉ có trên web, API chưa có autosave. Mất mạng lúc chọn đáp án thì chỉ báo "Chưa lưu được", không tự gửi lại. Bài bỏ dở được chấm trễ tối đa khoảng 1 phút. |
 | 21–22 | Gói IELTS | Chưa làm | Đề yêu cầu làm ít nhất 1 trong 3 task 20–22, đã chọn task 20. Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
 
