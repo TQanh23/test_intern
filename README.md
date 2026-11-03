@@ -2,7 +2,7 @@
 
 Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
-**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài, chấm điểm, trang kết quả, thống kê admin và activity log. Chưa có API. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
+**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài, chấm điểm, trang kết quả, thống kê admin, activity log và API danh sách đề, nộp bài. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
 
 ## Chạy dự án
 
@@ -65,6 +65,7 @@ Schema MySQL đã có migration. Hai collection MongoDB đã có Model và index
 | Nơi lưu | Dữ liệu | Lý do |
 |---|---|---|
 | MySQL | `users`, `exams`, `questions`, `options` | Dữ liệu có quan hệ chặt, được admin sửa thường xuyên, cần foreign key và ràng buộc unique. |
+| MySQL | `personal_access_tokens` | Token API của Sanctum, gắn với `users`. |
 | MongoDB | `attempts` | Mỗi lượt làm bài là một document chứa snapshot câu hỏi, câu trả lời và điểm. Đọc kết quả không cần join. |
 | MongoDB | `activity_logs` | Dữ liệu chỉ ghi thêm, số lượng lớn, mỗi hành động có thể có trường khác nhau. |
 
@@ -237,6 +238,35 @@ Trang `/admin/statistics`. Ba số liệu do [StatisticsService](app/Services/St
 - **Gọi thẳng collection, không dùng `Attempt::raw()`:** `raw()` biến mỗi dòng kết quả thành model `Attempt`. Gọi collection thì nhận về mảng thường.
 - **Xếp theo tỷ lệ trung bình có nhược điểm:** học sinh chỉ làm một bài đạt 100% vẫn đứng đầu.
 
+### API
+
+Xác thực bằng token Sanctum, gửi trong header `Authorization: Bearer <token>`. Chỉ tài khoản student gọi được, giống phần làm bài trên web.
+
+| Method | URL | Thành công | Lỗi |
+|---|---|---|---|
+| GET | `/api/exams` | 200: `data` (`id`, `name`, `duration_minutes`, `questions_count`), `links`, `meta`; 10 đề mỗi trang | 401, 403 |
+| POST | `/api/attempts/{id}/submit` | 200: `data` gồm điểm, `status`, giờ bắt đầu, hạn nộp, giờ nộp và `questions` đã chấm | 401; 403 nếu không phải bài của mình; 404; 422 nếu `answers` sai định dạng, bài đã nộp hoặc đã hết giờ |
+
+Body khi nộp bài giống form web: `{"answers": {"<question_id>": <option_id>}}`. Câu bỏ trống thì không gửi. Lỗi theo format mặc định của Laravel: luôn có `message`, riêng 422 có thêm `errors`.
+
+Chưa có endpoint đăng nhập hay bắt đầu bài. Để thử bằng tay:
+
+```bash
+# 1. Tạo token cho tài khoản student mẫu
+docker compose exec app php artisan tinker --execute="echo App\Models\User::where('email','student@example.com')->first()->createToken('manual')->plainTextToken;"
+
+# 2. Lấy danh sách đề
+curl -H "Authorization: Bearer <token>" http://localhost:8000/api/exams
+
+# 3. Bắt đầu một bài trên web, lấy id trên URL /attempts/<id>, rồi nộp
+curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d "{\"answers\":{}}" http://localhost:8000/api/attempts/<id>/submit
+```
+
+- **Dùng lại Service, FormRequest, Policy và middleware của web:** API chỉ thêm controller và Resource. Logic chấm điểm chỉ có một chỗ, nên web và API luôn cho cùng một kết quả, và nộp qua API cũng có activity log.
+- **Lỗi ở `/api/*` luôn trả JSON:** khai báo trong `bootstrap/app.php`. Nếu không, client không gửi `Accept: application/json` sẽ bị redirect về `/login` thay vì nhận 401.
+- **`AttemptResource` chỉ trả `questions` khi bài đã nộp:** snapshot chứa đáp án đúng. Sau này có thêm endpoint xem bài đang làm thì đáp án cũng không bị lộ.
+- **Token Sanctum không hết hạn:** giữ mặc định của Sanctum (`expiration = null`). Thu hồi bằng cách xóa dòng tương ứng trong `personal_access_tokens`.
+
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
 Đề yêu cầu Laravel 11, nhưng nhánh 11.x không còn được vá nên Composer chặn cài đặt. Dự án khóa ở `^11.57` và chỉ bỏ qua đúng 5 mã cảnh báo trong `composer.json`, không tắt cơ chế chặn.
@@ -272,7 +302,8 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 13 | Trang kết quả | Xong | Chưa có lịch sử làm bài, rời trang rồi chỉ mở lại được kết quả qua URL. |
 | 14 | Thống kê admin | Xong | Chưa có cache, mỗi lần mở trang chạy 3 aggregation. Chưa lọc theo thời gian. |
 | 15 | Activity log | Xong | Chưa có trang xem log, chỉ xem được trong MongoDB. Chưa ghi thao tác với câu hỏi. |
-| 16–17 | API, tổ chức code | Chưa làm | |
+| 16 | API REST | Xong | Chưa có endpoint đăng nhập và bắt đầu bài, phải tạo token bằng tinker và bắt đầu bài trên web. |
+| 17 | Tổ chức code | Chưa làm | |
 | 18 | Feature test | Một phần | Đã có test chấm điểm và nộp quá giờ. Các tính năng chưa làm chưa có test. |
 | 19 | Bonus | Chưa làm | |
 | 20–22 | Nâng cao | Chưa làm | Task 21 cần thêm `ffmpeg` vào image để cắt audio. |

@@ -58,7 +58,7 @@ class AttemptService
      *
      * @param  array<int|string, int|string|null>  $answers  question_id => option_id
      */
-    public function submit(Attempt $attempt, array $answers): void
+    public function submit(Attempt $attempt, array $answers): Attempt
     {
         if ($attempt->status !== 'in_progress') {
             $this->reject('Bài này đã được nộp.');
@@ -88,8 +88,12 @@ class AttemptService
             $this->reject('Bài này đã được nộp.');
         }
 
-        // Đọc lại để event mang điểm vừa lưu. Lệnh update ở trên không phát model event.
-        AttemptSubmitted::dispatch($attempt->fresh());
+        // Đọc lại để có điểm vừa lưu. Lệnh update ở trên không phát model event.
+        $submitted = $attempt->fresh();
+
+        AttemptSubmitted::dispatch($submitted);
+
+        return $submitted;
     }
 
     /**
