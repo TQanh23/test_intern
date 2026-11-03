@@ -2,7 +2,7 @@
 
 Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
-**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài, chấm điểm và trang kết quả. Đã có activity log. Chưa có thống kê và API. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
+**Trạng thái hiện tại:** đã xong phần setup, quản lý đề thi, làm bài, chấm điểm, trang kết quả, thống kê admin và activity log. Chưa có API. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
 
 ## Chạy dự án
 
@@ -221,6 +221,22 @@ Không controller nào ghi log. Mọi log đi qua [RecordActivity](app/Listeners
 - **Không ghi `Registered`:** đăng ký xong Laravel tự đăng nhập luôn, nên đã có log `auth.login`.
 - **Chưa ghi thao tác với câu hỏi:** chỉ ghi ở cấp đề thi. Muốn ghi thì thêm `QuestionObserver` theo cùng cách.
 
+### Thống kê
+
+Trang `/admin/statistics`. Ba số liệu do [StatisticsService](app/Services/StatisticsService.php) tính bằng aggregation trên `attempts`, chỉ lấy bài có `status = submitted`.
+
+| Số liệu | Cách tính |
+|---|---|
+| Tỷ lệ đúng trung bình theo đề | `$group` theo `exam_id`, lấy trung bình `score / total` |
+| Top 10 học sinh | `$group` theo `user_id`, lấy trung bình `score / total`. Bằng nhau thì ai nộp nhiều bài hơn xếp trước. Tên học sinh lấy từ MySQL bằng một query `whereIn` |
+| 10 câu sai nhiều nhất | `$unwind` mảng `questions`, `$group` theo `question_id`, đếm số lần `is_correct = false` |
+
+- **Tính theo tỷ lệ, không theo số câu đúng:** các đề có số câu khác nhau. Admin cũng có thể thêm câu sau khi đã có bài nộp, nên các bài của cùng một đề cũng có thể có `total` khác nhau.
+- **Câu bỏ trống tính là sai:** giống quy tắc lúc chấm điểm.
+- **Tên đề và nội dung câu lấy từ snapshot của bài nộp gần nhất:** đề đã xóa hoặc đổi tên vẫn hiển thị được, không phải query MySQL theo từng dòng.
+- **Gọi thẳng collection, không dùng `Attempt::raw()`:** `raw()` biến mỗi dòng kết quả thành model `Attempt`. Gọi collection thì nhận về mảng thường.
+- **Xếp theo tỷ lệ trung bình có nhược điểm:** học sinh chỉ làm một bài đạt 100% vẫn đứng đầu.
+
 ### Giữ Laravel 11 dù có cảnh báo bảo mật
 
 Đề yêu cầu Laravel 11, nhưng nhánh 11.x không còn được vá nên Composer chặn cài đặt. Dự án khóa ở `^11.57` và chỉ bỏ qua đúng 5 mã cảnh báo trong `composer.json`, không tắt cơ chế chặn.
@@ -254,7 +270,7 @@ Lý do chung: bài đang được làm theo thứ tự, phần setup làm trư�
 | 11 | Bắt đầu làm bài | Xong | |
 | 12 | Nộp bài và chấm điểm | Xong | Chưa có đồng hồ đếm ngược, trang chỉ hiện giờ hạn nộp. |
 | 13 | Trang kết quả | Xong | Chưa có lịch sử làm bài, rời trang rồi chỉ mở lại được kết quả qua URL. |
-| 14 | Thống kê admin | Chưa làm | |
+| 14 | Thống kê admin | Xong | Chưa có cache, mỗi lần mở trang chạy 3 aggregation. Chưa lọc theo thời gian. |
 | 15 | Activity log | Xong | Chưa có trang xem log, chỉ xem được trong MongoDB. Chưa ghi thao tác với câu hỏi. |
 | 16–17 | API, tổ chức code | Chưa làm | |
 | 18 | Feature test | Một phần | Đã có test chấm điểm và nộp quá giờ. Các tính năng chưa làm chưa có test. |

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\ExamController;
 use App\Http\Controllers\Admin\QuestionController;
+use App\Http\Controllers\Admin\StatisticsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Student\AttemptController;
 use App\Http\Controllers\Student\ExamController as StudentExamController;
@@ -20,6 +21,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         return view('admin.dashboard');
     })->name('dashboard');
 
+    Route::get('statistics', [StatisticsController::class, 'index'])->name('statistics');
     Route::resource('exams', ExamController::class)->except('show');
     Route::resource('exams.questions', QuestionController::class)->shallow()->except(['index', 'show']);
 });
