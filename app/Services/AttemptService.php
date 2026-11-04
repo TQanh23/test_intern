@@ -156,10 +156,10 @@ class AttemptService
             $this->reject('Bài này đã được nộp.');
         }
 
-        // Hết giờ thì không nhận đáp án gửi kèm, chấm theo các đáp án đã autosave.
-        if ($attempt->isExpired()) {
-            $answers = array_column($attempt->questions, 'selected_option_id', 'question_id');
-        }
+        $saved = array_column($attempt->questions, 'selected_option_id', 'question_id');
+
+        // Hết giờ thì chỉ chấm đáp án đã autosave. Còn hạn thì đáp án gửi lên đè lên đáp án đã lưu, câu không gửi giữ đáp án đã lưu.
+        $answers = $attempt->isExpired() ? $saved : $answers + $saved;
 
         $questions = array_map(
             fn (array $question) => $this->grade($question, $answers[$question['question_id']] ?? null),

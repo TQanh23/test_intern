@@ -105,6 +105,24 @@ class SubmitAttemptApiTest extends TestCase
             ->assertJsonPath('data.score', 0);
     }
 
+    public function test_submit_before_deadline_keeps_autosaved_answers(): void
+    {
+        Sanctum::actingAs($this->student);
+        $correct = $this->correctAnswers();
+        [$first, $second] = array_keys($correct);
+
+        $service = app(AttemptService::class);
+        $service->saveAnswer($this->attempt, $first, $correct[$first]);
+        $service->saveAnswer($this->attempt, $second, $correct[$second]);
+
+        // Câu $first chỉ có trong autosave. Câu $second gửi lên đáp án sai, đáp án gửi lên được ưu tiên.
+        $wrong = Option::where('question_id', $second)->where('is_correct', false)->value('id');
+
+        $this->submit(['answers' => [$second => $wrong]])
+            ->assertOk()
+            ->assertJsonPath('data.score', 1);
+    }
+
     public function test_invalid_answers_returns_422(): void
     {
         Sanctum::actingAs($this->student);

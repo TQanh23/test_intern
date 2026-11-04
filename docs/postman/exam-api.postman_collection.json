@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Exam API",
-    "description": "API danh sách đề và nộp bài.\n\nChuẩn bị:\n1. Tạo token cho student mẫu:\n   docker compose exec app php artisan tinker --execute=\"echo App\\Models\\User::where('email','student@example.com')->first()->createToken('postman')->plainTextToken;\"\n2. Bắt đầu một bài trên web, lấy id trên URL /attempts/<id>.\n3. Điền token và attempt_id vào biến của collection rồi chạy lần lượt từ trên xuống.",
+    "description": "API đăng nhập, danh sách đề và nộp bài.\n\nChuẩn bị:\n1. Bắt đầu một bài trên web, lấy id trên URL /attempts/<id>.\n2. Điền attempt_id vào biến của collection rồi chạy lần lượt từ trên xuống. Request \"Đăng nhập\" tự gán biến token.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -16,6 +16,38 @@
     { "key": "attempt_id", "value": "" }
   ],
   "item": [
+    {
+      "name": "Đăng nhập",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"email\": \"student@example.com\",\n    \"password\": \"password\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/api/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 và có token', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().token).to.be.a('string');",
+              "});",
+              "pm.collectionVariables.set('token', pm.response.json().token);"
+            ]
+          }
+        }
+      ]
+    },
     {
       "name": "Danh sách đề",
       "request": {
@@ -82,7 +114,7 @@
           "options": { "raw": { "language": "json" } }
         },
         "url": "{{base_url}}/api/attempts/{{attempt_id}}/submit",
-        "description": "answers có dạng {\"<question_id>\": <option_id>}. Câu bỏ trống thì không gửi. Nộp quá giờ vẫn trả 200, chấm theo các đáp án đã lưu."
+        "description": "answers có dạng {\"<question_id>\": <option_id>}. Câu không gửi thì lấy đáp án đã autosave, gửi null để bỏ chọn. Nộp quá giờ vẫn trả 200, chấm theo các đáp án đã lưu."
       },
       "event": [
         {
