@@ -4,7 +4,9 @@ namespace App\Listeners;
 
 use App\Events\AttemptStarted;
 use App\Events\AttemptSubmitted;
+use App\Events\DocumentPreviewed;
 use App\Models\ActivityLog;
+use App\Models\PreviewLog;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 
@@ -45,6 +47,23 @@ class RecordActivity
                 'score' => $event->attempt->score,
                 'total' => $event->attempt->total,
             ],
+        ]);
+    }
+
+    /**
+     * Ghi vào preview_logs riêng, không vào activity_logs, để thống kê lượt xem thử chỉ quét đúng loại log này.
+     */
+    public function handleDocumentPreviewed(DocumentPreviewed $event): void
+    {
+        $package = $event->document->unit->package;
+
+        PreviewLog::create([
+            'user_id' => $event->user->id,
+            'ip' => $event->ip,
+            'document_id' => $event->document->id,
+            'document_title' => $event->document->title,
+            'package_id' => $package->id,
+            'package_name' => $package->name,
         ]);
     }
 }

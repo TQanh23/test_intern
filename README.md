@@ -2,7 +2,7 @@
 
 Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
-**Trạng thái hiện tại:** đã xong task 1–20, gồm cả bonus (task 19) và task nâng cao 20 (autosave). Không làm task 21–22 vì đề chỉ yêu cầu 1 trong 3 task nâng cao. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
+**Trạng thái hiện tại:** đã xong task 1–21, gồm cả bonus (task 19), task nâng cao 20 (autosave) và 21 (backend gói IELTS). Không làm task 22 (giao diện gói IELTS) vì đề chỉ yêu cầu 1 trong 3 task nâng cao. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
 
 ## Chạy dự án
 
@@ -30,6 +30,8 @@ Nếu trùng cổng, sửa phần `ports` trong `docker-compose.yml`. App không
 | Student | `student@example.com` | `password` |
 
 Seeder cũng tạo 2 đề: "Toán cơ bản" (15 phút, 5 câu) và "Tiếng Anh cơ bản" (10 phút, 4 câu), mỗi câu có 4 đáp án. Câu hỏi viết tay để biết trước đáp án đúng khi kiểm tra điểm. Các tài khoản này chỉ dùng cho dev và demo.
+
+Seeder còn tạo 3 gói "Mindset for IELTS Level 1/2/3", mỗi gói 3 unit, mỗi unit một PDF 10 trang (xem thử 3 trang) và một file WAV 60 giây. File do code tự sinh ([SampleFiles](database/seeders/Support/SampleFiles.php)): PDF chỉ ghi tiêu đề và số trang, audio là tiếng bíp 400 Hz. Không dùng bản scan sách thật. File nằm ở `storage/app/private/documents`.
 
 Đăng nhập tại <http://localhost:8000/login>. Trang quản trị ở `/admin`, chỉ tài khoản admin mở được.
 
@@ -61,14 +63,16 @@ Các thông tin trên chỉ dùng cho môi trường dev.
 
 ### Dữ liệu nào để MySQL, dữ liệu nào để MongoDB
 
-Schema MySQL đã có migration. Hai collection MongoDB đã có Model và index. `attempts` được ghi khi làm bài, `activity_logs` được ghi qua Event/Observer.
+Schema MySQL đã có migration. Ba collection MongoDB đã có Model và index. `attempts` được ghi khi làm bài, `activity_logs` và `preview_logs` được ghi qua Event/Observer.
 
 | Nơi lưu | Dữ liệu | Lý do |
 |---|---|---|
 | MySQL | `users`, `exams`, `questions`, `options` | Dữ liệu có quan hệ chặt, được admin sửa thường xuyên, cần foreign key và ràng buộc unique. |
 | MySQL | `personal_access_tokens` | Token API của Sanctum, gắn với `users`. |
+| MySQL | `packages`, `units`, `documents` | Gói IELTS: cây gói → unit → tài liệu, cần foreign key và xóa theo. |
 | MongoDB | `attempts` | Mỗi lượt làm bài là một document chứa snapshot câu hỏi, câu trả lời và điểm. Đọc kết quả không cần join. |
 | MongoDB | `activity_logs` | Dữ liệu chỉ ghi thêm, số lượng lớn, mỗi hành động có thể có trường khác nhau. |
+| MongoDB | `preview_logs` | Mỗi lượt xem thử tài liệu. Chỉ ghi thêm, dùng cho thống kê bằng aggregation. |
 
 - **Vì sao `attempts` cần snapshot:** nếu admin sửa hoặc xóa câu hỏi sau khi thi, bài đã nộp vẫn phải giữ nguyên nội dung và điểm.
 - **Thống kê:** điểm trung bình, top học sinh và câu sai nhiều đều nằm trong `attempts`, nên dùng aggregation của MongoDB.
@@ -80,6 +84,8 @@ Schema MySQL đã có migration. Hai collection MongoDB đã có Model và index
 erDiagram
     exams ||--o{ questions : "có"
     questions ||--o{ options : "có"
+    packages ||--o{ units : "có"
+    units ||--o{ documents : "có"
 
     users {
         bigint id PK
@@ -117,15 +123,46 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
+
+    packages {
+        bigint id PK
+        varchar name
+        varchar slug UK
+        tinyint level "có index"
+        text description "nullable"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    units {
+        bigint id PK
+        bigint package_id FK
+        varchar title
+        smallint position "index cùng package_id"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    documents {
+        bigint id PK
+        bigint unit_id FK
+        varchar title
+        enum type "pdf hoặc audio"
+        varchar file_path "trong storage private"
+        smallint page_count "nullable, chỉ PDF"
+        smallint preview_pages "nullable, chỉ PDF"
+        timestamp created_at
+        timestamp updated_at
+    }
 ```
 
-- **Xóa theo:** xóa một đề sẽ xóa các câu hỏi của đề đó, xóa một câu hỏi sẽ xóa các đáp án của câu đó (`ON DELETE CASCADE`).
+- **Xóa theo:** xóa một đề sẽ xóa các câu hỏi của đề đó, xóa một câu hỏi sẽ xóa các đáp án của câu đó (`ON DELETE CASCADE`). Gói → unit → tài liệu cũng vậy.
 - **`users` đứng riêng:** không có khóa ngoại tới bảng đề thi, vì lượt làm bài nối học sinh với đề nằm ở `attempts` trong MongoDB.
 - **Không vẽ các bảng hạ tầng của Laravel:** `password_reset_tokens`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`.
 
 ### Collection MongoDB
 
-Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`. `attempts` có thêm unique index một phần `one_open_attempt_per_exam`, xem mục [Autosave và tiếp tục bài](#autosave-và-tiếp-tục-bài). Index được tạo bằng migration, dùng `table()` thay vì `create()` vì `migrate:fresh` không xóa collection.
+`attempts` và `activity_logs` đều có index trên `user_id`, `exam_id` và `created_at`. `attempts` có thêm unique index một phần `one_open_attempt_per_exam`, xem mục [Autosave và tiếp tục bài](#autosave-và-tiếp-tục-bài). Index được tạo bằng migration, dùng `table()` thay vì `create()` vì `migrate:fresh` không xóa collection.
 
 `attempts`:
 
@@ -148,6 +185,16 @@ Cả hai collection đều có index trên `user_id`, `exam_id` và `created_at`
 | `exam_id` | int | Để trống khi hành động không gắn với đề |
 | `details` | object | Thông tin thêm, tùy hành động |
 | `created_at` | date | Không có `updated_at` vì log chỉ ghi thêm |
+
+`preview_logs` (index trên `document_id`, `package_id`, `created_at`):
+
+| Trường | Kiểu | Ghi chú |
+|---|---|---|
+| `user_id` | int | Người bấm xem thử |
+| `ip` | string | IP của request |
+| `document_id`, `document_title` | int, string | Lưu cả tên, xóa tài liệu vẫn còn |
+| `package_id`, `package_name` | int, string | Lưu sẵn để thống kê theo gói không phải join MySQL |
+| `created_at` | date | Không có `updated_at` |
 
 - **`questions` không cast sang `array`:** cần giữ mảng thật trong MongoDB để `$unwind` ở phần thống kê hoạt động.
 - **`score` là số câu đúng:** các đề có số câu khác nhau, nên xếp hạng giữa các đề phải tính theo `score / total`.
@@ -259,7 +306,7 @@ Trang `/admin/statistics`. Ba số liệu do [StatisticsService](app/Services/St
 
 ### API
 
-Xác thực bằng token Sanctum, gửi trong header `Authorization: Bearer <token>`. Chỉ tài khoản student gọi được, giống phần làm bài trên web.
+Xác thực bằng token Sanctum, gửi trong header `Authorization: Bearer <token>`. API đề thi và nộp bài chỉ tài khoản student gọi được, giống phần làm bài trên web. API gói IELTS ở mục [Gói IELTS và xem thử](#gói-ielts-và-xem-thử).
 
 | Method | URL | Thành công | Lỗi |
 |---|---|---|---|
@@ -290,7 +337,7 @@ curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/js
 
 #### Postman collection
 
-File [docs/postman/exam-api.postman_collection.json](docs/postman/exam-api.postman_collection.json) có 5 request: đăng nhập, lấy danh sách đề, lấy danh sách khi không có token (401), nộp bài (200), nộp lại (422). Mỗi request có test kiểm tra status code và format JSON. Request đăng nhập tự gán biến `token` cho các request sau.
+File [docs/postman/exam-api.postman_collection.json](docs/postman/exam-api.postman_collection.json) có 9 request: đăng nhập, lấy danh sách đề, lấy danh sách khi không có token (401), danh sách gói IELTS, chi tiết gói, xin link xem thử, mở link xem thử (PDF), nộp bài (200), nộp lại (422). Mỗi request có test kiểm tra status code và format JSON. Request đăng nhập tự gán biến `token`, các request gói IELTS tự gán `document_id` và `preview_url`.
 
 - **Dùng trong Postman:** Import file, điền biến `attempt_id` của collection (cách lấy như bước 3 ở trên), rồi chạy lần lượt từ trên xuống.
 - **Chạy tự động bằng newman,** không cần cài gì trên máy:
@@ -300,6 +347,39 @@ docker run --rm --network test_intern_default -v "$PWD/docs/postman:/etc/newman"
 ```
 
 Request nộp bài sẽ nộp thật attempt đó. Trên Windows Git Bash, thay `$PWD` bằng `$(pwd -W)` và đặt `MSYS_NO_PATHCONV=1` trước lệnh.
+
+### Gói IELTS và xem thử
+
+Mọi tài khoản đã đăng nhập (admin hoặc student) đều gọi được, trừ API thống kê chỉ dành cho admin.
+
+| Method | URL | Thành công | Lỗi |
+|---|---|---|---|
+| GET | `/api/packages?level=1` | 200: `data` (`id`, `name`, `slug`, `level`, `description`), `links`, `meta`; 10 gói mỗi trang. `level` không bắt buộc | 401; 422 nếu `level` không phải 1, 2, 3 |
+| GET | `/api/packages/{slug}` | 200: gói kèm `units` (theo `position`), mỗi unit có `documents` (`id`, `title`, `type`, `page_count`, `preview_pages`) | 401, 404 |
+| POST | `/api/documents/{id}/preview` | 200: `data.url` (link có chữ ký, hạn 5 phút), `data.expires_at`. Ghi một dòng `preview_logs` | 401, 404; 429 nếu quá 10 lần mỗi phút |
+| GET | `data.url` ở trên | 200: PDF chỉ có `preview_pages` trang đầu, hoặc WAV 15 giây đầu. Không cần token | 403 nếu sai chữ ký, sửa URL hoặc hết hạn; 429 nếu quá 60 lần mỗi phút |
+| GET | `/api/admin/preview-stats` | 200: `data.packages` (`package_id`, `package_name`, `views`), `data.documents` (`document_id`, `document_title`, `package_name`, `views`), mỗi loại top 10 | 401; 403 nếu không phải admin |
+
+- **File gốc không có URL nào:** file nằm ở `storage/app/private`, ngoài thư mục `public`. Disk `local` đặt `serve => false` để Laravel không tạo route `/storage/{path}` cho disk này. Resource không trả `file_path`. Chỉ [PreviewService](app/Services/PreviewService.php) đọc file gốc trong PHP rồi trả về bản cắt.
+- **Link xem thử dùng `URL::temporarySignedRoute`:** chữ ký tính trên toàn bộ URL gồm id tài liệu và `expires`. Sửa bất kỳ phần nào hoặc quá hạn thì middleware `signed` trả 403. Link không cần token vì pdf.js và thẻ `<audio>` (task 22) mở link trực tiếp, không gửi được header `Authorization`. Chữ ký thay cho đăng nhập.
+- **Cắt PDF bằng FPDI** (`setasign/fpdi` + `setasign/fpdf`): chép `preview_pages` trang đầu sang một PDF mới. Cắt trang buộc phải đọc được cấu trúc PDF, tự viết thì dài và khó kiểm tra. FPDF cũng dùng để seeder tạo PDF mẫu. FPDI bản miễn phí không đọc được PDF nén cross-reference (PDF 1.5 trở lên). File seeder tạo thì đọc được, còn file PDF thật thì có thể cần bản trả phí hoặc chuyển đổi trước.
+- **Audio dùng WAV, không dùng MP3:** cắt WAV chỉ là giữ header 44 byte, lấy `byte rate × 15` byte dữ liệu đầu rồi sửa hai trường kích thước trong header. Không cần cài `ffmpeg` vào image. Đổi lại file nặng hơn, khoảng 480 KB cho 60 giây ở 8 kHz mono 8-bit.
+- **Cắt lại mỗi lần mở link:** file mẫu nhỏ nên vẫn nhanh. Với file thật lớn thì nên cắt sẵn một lần lúc upload.
+- **Ghi log lúc cấp link, không ghi lúc tải file:** một lượt xem thử là một lần bấm nút. Mở lại link cũ trong 5 phút không tính thêm lượt. Log ghi qua event `DocumentPreviewed` và listener `RecordActivity`, không ghi trong controller.
+- **Rate limit:** limiter `preview` (10 link mỗi phút cho mỗi user) khai báo trong `AppServiceProvider`. Route tải file không có user nên dùng `throttle:60,1` theo IP, để một link còn hạn không bị tải liên tục.
+- **Thống kê đếm trên `preview_logs`:** `$group` theo `package_id` hoặc `document_id`, đếm số dòng, lấy tên ở lượt xem gần nhất, xếp giảm dần, lấy 10. Nằm trong `StatisticsService` cùng các thống kê khác.
+- **Thư mục trong disk `local` có quyền 0755 (`directory_visibility => public`):** mặc định là 0700. Seed chạy bằng root nên php-fpm (`www-data`) không vào được thư mục và mọi link xem thử trả 404. Quyền này chỉ áp dụng trên máy chủ, không tạo URL nào.
+
+Thử bằng tay (Git Bash hoặc Linux):
+
+```bash
+TOKEN=<token từ /api/login>
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:8000/api/packages?level=1"
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/packages/mindset-for-ielts-level-1
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" http://localhost:8000/api/documents/1/preview
+curl -o preview.pdf "<data.url ở trên, bỏ các dấu \ trước />"   # PDF 3 trang
+curl -i http://localhost:8000/storage/documents/level-1/unit-1.pdf   # 404
+```
 
 ### Cache danh sách đề
 
@@ -317,9 +397,9 @@ Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặ
 
 | Việc | Nơi đặt | Ví dụ |
 |---|---|---|
-| Logic nghiệp vụ | `app/Services` | `AttemptService` (bắt đầu bài, autosave, chấm điểm, chấm bài bỏ dở), `ExamService` (danh sách đề có cache, tạo và sửa câu hỏi), `StatisticsService` |
-| Validate | FormRequest | `ExamRequest`, `QuestionRequest`, `SubmitAttemptRequest`, `SaveAnswerRequest` |
-| Response API | API Resource | `ExamResource`, `AttemptResource` |
+| Logic nghiệp vụ | `app/Services` | `AttemptService` (bắt đầu bài, autosave, chấm điểm, chấm bài bỏ dở), `ExamService` (danh sách đề có cache, tạo và sửa câu hỏi), `StatisticsService`, `PackageService`, `PreviewService` (cấp link, cắt PDF và audio) |
+| Validate | FormRequest | `ExamRequest`, `QuestionRequest`, `SubmitAttemptRequest`, `SaveAnswerRequest`, `PackageIndexRequest` |
+| Response API | API Resource | `ExamResource`, `AttemptResource`, `PackageResource`, `UnitResource`, `DocumentResource` |
 | Phân quyền | Middleware, Policy | `admin`, `student`, `AttemptPolicy` |
 | Ghi log, xóa cache | Event/Listener, Observer | `RecordActivity`, `ExamObserver`, `ExamListCacheObserver` |
 | Lệnh định kỳ | Command, chỉ gọi Service | `app:close-expired-attempts` |
@@ -330,13 +410,15 @@ Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặ
   - trang sửa câu hỏi: `load('options')`
   - danh sách đề: `withCount('questions')`, không đếm theo từng đề
   - thống kê: một query `whereIn` lấy tên cho cả 10 học sinh
+  - chi tiết gói: `load('units', 'units.documents')`, hai query cho cả cây
+  - cấp link xem thử: `load('unit.package')` để listener lấy tên gói
 
   Trang làm bài và trang kết quả chỉ đọc snapshot trong một document MongoDB, không có relation nào.
 - **`Admin\ExamController` vẫn gọi thẳng `Exam::create`, `update`, `delete`:** mỗi chỗ chỉ là một lệnh Eloquent với dữ liệu đã validate, không có logic. Bọc vào Service chỉ thêm một lớp chuyển tiếp mà không thêm hành vi. `createQuestion` và `updateQuestion` nằm trong Service vì cần transaction và tạo lại đáp án. Log và xóa cache của đề do Observer xử lý, nên controller không phải gọi thêm gì.
 
 ### Feature test
 
-`docker compose exec app php artisan test` chạy toàn bộ test. CI cũng chạy lại mỗi lần push và mỗi pull request. Hiện có 145 test, tất cả đều pass.
+`docker compose exec app php artisan test` chạy toàn bộ test. CI cũng chạy lại mỗi lần push và mỗi pull request. Hiện có 163 test, tất cả đều pass.
 
 | File | Kiểm tra |
 |---|---|
@@ -345,6 +427,8 @@ Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặ
 | `Student/StartAttemptTest` | Tạo attempt, snapshot đầy đủ, ẩn đáp án, quyền xem |
 | `CloseExpiredAttemptsTest` | Command chấm bài bỏ dở, lịch chạy mỗi phút |
 | `Api/ExamApiTest`, `Api/SubmitAttemptApiTest` | Format response và status code 200, 401, 403, 404, 422 |
+| `Api/DocumentPreviewApiTest` | Link có chữ ký, PDF đúng số trang xem thử, WAV đúng 15 giây, link hết hạn hoặc bị sửa trả 403, file gốc không có URL, ghi `preview_logs`, rate limit 429 |
+| `Api/PackageApiTest`, `Api/PreviewStatisticsApiTest` | Lọc level, phân trang, mục lục theo unit, 404, 422; thống kê lượt xem khớp dữ liệu biết trước, student bị 403 |
 | `Admin/ExamManagementTest`, `Admin/QuestionManagementTest` | CRUD, tìm kiếm, phân trang, validate, eager loading |
 | `Admin/StatisticsTest` | 3 số liệu thống kê với dữ liệu biết trước điểm |
 | `ActivityLogTest`, `ExamListCacheTest` | Log qua Event/Observer, cache và xóa cache |
@@ -360,7 +444,7 @@ Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặ
 | `PKSA-b41t-wbzk-9q51` | Critical | Bypass xác thực ở `TokenGuard` | Không dùng auth driver `token`. |
 | `PKSA-3r5d-mb8f-1qw9` | High | CRLF injection ở rule email mặc định | Dự án chạy local, mail chỉ ghi log. |
 | `PKSA-mdq4-51ck-6kdq` | Chưa phân loại | Cùng lỗi CRLF ở trên | Như trên. |
-| `PKSA-m5cs-t1y6-qpcs` | Medium | Nhầm đường dẫn ở Temporary Signed URL | Phải kiểm tra lại trước khi làm task 21. |
+| `PKSA-m5cs-t1y6-qpcs` | Medium | Nhầm đường dẫn ở Temporary Signed URL của disk `local` (`Storage::temporaryUrl`) | Không dùng `Storage::temporaryUrl`, tắt `serve` của disk `local`. Link xem thử dùng `URL::temporarySignedRoute` với id tài liệu, không nằm trong phạm vi lỗi. |
 | `PKSA-d5tc-s1qs-h781` | Low | XSS ở trang debug | Chỉ bật `APP_DEBUG` ở local. |
 
 Khi triển khai thật cần nâng lên Laravel 12.69+ hoặc 13.30+.
@@ -391,11 +475,12 @@ Mọi task bắt buộc đều đã xong. Cột "Còn thiếu" ghi những phầ
 | 18 | Feature test | Xong | Test giao diện chỉ kiểm tra HTML trả về. Phần JS (autosave, đồng hồ) chưa có test trên trình duyệt. |
 | 19 | Bonus | Xong | Đã làm cache danh sách đề và Postman collection. Không làm Swagger. |
 | 20 | Autosave và tiếp tục bài | Xong | Chỉ có trên web, API chưa có autosave. Mất mạng lúc chọn đáp án thì chỉ báo "Chưa lưu được", không tự gửi lại. Bài bỏ dở được chấm trễ tối đa khoảng 1 phút. |
-| 21–22 | Gói IELTS | Chưa làm | Đề yêu cầu làm ít nhất 1 trong 3 task 20–22, đã chọn task 20. Task 21 cần thêm `ffmpeg` vào image để cắt audio. |
+| 21 | Gói IELTS (backend) | Xong | Chỉ cắt được WAV và PDF dạng FPDI bản miễn phí đọc được (như file seeder tạo), chưa hỗ trợ MP3 hay PDF 1.5+. Chưa có API upload hoặc CRUD gói. Bản xem thử được cắt lại mỗi lần mở link. |
+| 22 | Gói IELTS (giao diện) | Chưa làm | Đề yêu cầu làm ít nhất 1 trong 3 task 20–22, đã làm task 20 và 21. |
 
 Các hạn chế khác:
 
-- **MongoDB lỗi thì đăng nhập cũng lỗi:** log được ghi đồng bộ trong cùng request. Khi đó làm bài cũng không được, vì `attempts` cũng nằm trong MongoDB.
+- **MongoDB lỗi thì đăng nhập và xin link xem thử cũng lỗi:** log được ghi đồng bộ trong cùng request. Khi đó làm bài cũng không được, vì `attempts` cũng nằm trong MongoDB.
 - **Seed cũng sinh log:** lần seed đầu ghi 2 log `exam.created` có `user_id` để trống, vì đề mẫu không do admin nào tạo.
 - **Bài bỏ dở được chấm trễ tối đa khoảng 1 phút:** trong khoảng đó bài vẫn là `in_progress` và chưa có trong thống kê. Nếu container `scheduler` không chạy thì bài chỉ được chấm khi học sinh quay lại.
 - **Mở 2 tab cùng một bài rồi đổi đáp án ở cả hai:** mỗi tab có hàng đợi lưu riêng, nên đáp án cuối cùng là của request đến server sau cùng, không chắc là lần chọn sau cùng.

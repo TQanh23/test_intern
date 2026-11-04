@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Exam API",
-    "description": "API đăng nhập, danh sách đề và nộp bài.\n\nChuẩn bị:\n1. Bắt đầu một bài trên web, lấy id trên URL /attempts/<id>.\n2. Điền attempt_id vào biến của collection rồi chạy lần lượt từ trên xuống. Request \"Đăng nhập\" tự gán biến token.",
+    "description": "API đăng nhập, danh sách đề, gói IELTS, xem thử tài liệu và nộp bài.\n\nChuẩn bị:\n1. Bắt đầu một bài trên web, lấy id trên URL /attempts/<id>.\n2. Điền attempt_id vào biến của collection rồi chạy lần lượt từ trên xuống. Request \"Đăng nhập\" tự gán biến token.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -13,7 +13,9 @@
   "variable": [
     { "key": "base_url", "value": "http://localhost:8000" },
     { "key": "token", "value": "" },
-    { "key": "attempt_id", "value": "" }
+    { "key": "attempt_id", "value": "" },
+    { "key": "document_id", "value": "" },
+    { "key": "preview_url", "value": "" }
   ],
   "item": [
     {
@@ -94,6 +96,102 @@
               "pm.test('401 dạng JSON dù không gửi Accept', () => {",
               "    pm.response.to.have.status(401);",
               "    pm.expect(pm.response.json().message).to.eql('Unauthenticated.');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Danh sách gói IELTS level 1",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": "{{base_url}}/api/packages?level=1"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 và chỉ có gói level 1', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.have.keys('data', 'links', 'meta');",
+              "    body.data.forEach(item => pm.expect(item.level).to.eql(1));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chi tiết gói và mục lục",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": "{{base_url}}/api/packages/mindset-for-ielts-level-1"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200, có units và documents, không có file_path', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const units = pm.response.json().data.units;",
+              "    pm.expect(units.length).to.be.above(0);",
+              "    pm.expect(units[0].documents[0]).to.not.have.property('file_path');",
+              "});",
+              "const pdf = pm.response.json().data.units[0].documents.find(doc => doc.type === 'pdf');",
+              "pm.collectionVariables.set('document_id', pdf.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Xin link xem thử PDF",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": "{{base_url}}/api/documents/{{document_id}}/preview"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 và có link có chữ ký', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().data.url).to.include('signature=');",
+              "});",
+              "pm.collectionVariables.set('preview_url', pm.response.json().data.url);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mở link xem thử",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "header": [],
+        "url": "{{preview_url}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 và là PDF, không cần token', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('application/pdf');",
               "});"
             ]
           }
