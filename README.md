@@ -173,7 +173,7 @@ GitHub Actions chạy [.github/workflows/ci.yml](.github/workflows/ci.yml) cho m
 ### Xác thực và phân quyền
 
 - **Breeze + Blade:** có sẵn đăng ký, đăng nhập và giới hạn số lần đăng nhập sai, đi kèm Alpine.js. PHP render trang nên dễ theo dõi hơn SPA.
-- **Sanctum chưa cài:** chỉ cần cho API, sẽ thêm khi làm API REST.
+- **Sanctum cho API:** web dùng session, API dùng token gửi trong header `Authorization: Bearer`. Chi tiết ở mục [API](#api).
 - **Middleware `admin`:** `EnsureUserIsAdmin` trả 403 nếu user không phải admin. Đề chỉ có một vùng cần chặn nên không làm dạng `role:admin` tổng quát.
 - **`role` không nằm trong `$fillable`:** client gửi `role=admin` khi đăng ký vẫn chỉ tạo được student, có test kiểm tra.
 
@@ -196,6 +196,7 @@ GitHub Actions chạy [.github/workflows/ci.yml](.github/workflows/ci.yml) cho m
 ### Nộp bài và chấm điểm
 
 - **Nộp quá giờ thì chấm theo các đáp án đã lưu:** đáp án gửi kèm sau hạn bị bỏ qua, vì nhận chúng là cho thêm giờ làm bài. Các câu đã autosave trước hạn vẫn được tính, nên trình duyệt tự nộp lúc hết giờ mà request đến trễ vài ms thì học sinh cũng không mất bài. Trước khi có autosave, bài nộp quá giờ bị từ chối hẳn.
+- **Nộp trước hạn thì gộp đáp án gửi lên với đáp án đã lưu:** đáp án gửi lên được ưu tiên, câu không gửi thì lấy đáp án đã autosave, gửi `null` để bỏ chọn. Web luôn gửi lại mọi câu đã chọn, nhưng client API có thể chỉ gửi `{"answers":{}}` sau khi đã autosave. Nếu không gộp thì client đó được 0 điểm, trong khi cùng bài đó nộp sau hạn lại được chấm theo đáp án đã lưu.
 - **Client chỉ gửi lựa chọn:** `score`, `is_correct`, `status` gửi lên bị bỏ qua. Đáp án phải thuộc đúng câu đó trong snapshot mới được tính.
 - **Chấm theo snapshot, không đọc MySQL:** admin sửa đề sau khi học sinh bắt đầu không làm đổi điểm.
 - **Ghi kết quả kèm điều kiện `status = in_progress`:** MongoDB xử lý một lần cập nhật một cách nguyên tử, nên hai request nộp cùng lúc chỉ có một request ghi được.
@@ -235,7 +236,7 @@ Không controller nào ghi log. Mọi log đi qua [RecordActivity](app/Listeners
 
 - **Bài làm dùng Event, không dùng Observer trên `Attempt`:** lúc nộp bài, code cập nhật bằng query có điều kiện `status = in_progress` để chống nộp hai lần. Lệnh update kiểu này không phát model event, nên Observer không bắt được.
 - **Đề thi dùng Observer:** admin controller gọi thẳng `Exam::create`, `update`, `delete`, nên model event tự phát mà không phải sửa controller.
-- **Event phát trong Service:** API nộp bài sau này gọi lại `AttemptService` nên tự có log.
+- **Event phát trong Service:** web, API và lệnh chấm bài bỏ dở đều gọi `AttemptService`, nên đều có log mà không phải ghi lại ở từng nơi.
 - **Listener chạy đồng bộ:** dự án chưa có queue worker. Thêm worker chỉ để ghi log thì phức tạp hơn mức cần.
 - **Không ghi `Registered`:** đăng ký xong Laravel tự đăng nhập luôn, nên đã có log `auth.login`.
 - **Chưa ghi thao tác với câu hỏi:** chỉ ghi ở cấp đề thi. Muốn ghi thì thêm `QuestionObserver` theo cùng cách.
@@ -262,16 +263,17 @@ Xác thực bằng token Sanctum, gửi trong header `Authorization: Bearer <tok
 
 | Method | URL | Thành công | Lỗi |
 |---|---|---|---|
+| POST | `/api/login` | 200: `token`. Không cần token | 422 nếu sai email, mật khẩu hoặc sai quá 5 lần |
 | GET | `/api/exams` | 200: `data` (`id`, `name`, `duration_minutes`, `questions_count`), `links`, `meta`; 10 đề mỗi trang | 401, 403 |
 | POST | `/api/attempts/{id}/submit` | 200: `data` gồm điểm, `status`, giờ bắt đầu, hạn nộp, giờ nộp và `questions` đã chấm | 401; 403 nếu không phải bài của mình; 404; 422 nếu `answers` sai định dạng hoặc bài đã nộp. Nộp quá giờ vẫn trả 200, chấm theo các đáp án đã lưu |
 
-Body khi nộp bài giống form web: `{"answers": {"<question_id>": <option_id>}}`. Câu bỏ trống thì không gửi. Lỗi theo format mặc định của Laravel: luôn có `message`, riêng 422 có thêm `errors`.
+Body khi nộp bài giống form web: `{"answers": {"<question_id>": <option_id>}}`. Câu không gửi thì lấy đáp án đã autosave, gửi `null` để bỏ chọn. Lỗi theo format mặc định của Laravel: luôn có `message`, riêng 422 có thêm `errors`.
 
-Chưa có endpoint đăng nhập hay bắt đầu bài. Để thử bằng tay:
+Chưa có endpoint bắt đầu bài. Để thử bằng tay:
 
 ```bash
-# 1. Tạo token cho tài khoản student mẫu
-docker compose exec app php artisan tinker --execute="echo App\Models\User::where('email','student@example.com')->first()->createToken('manual')->plainTextToken;"
+# 1. Đăng nhập bằng tài khoản student mẫu, lấy token
+curl -X POST -H "Content-Type: application/json" -d "{\"email\":\"student@example.com\",\"password\":\"password\"}" http://localhost:8000/api/login
 
 # 2. Lấy danh sách đề
 curl -H "Authorization: Bearer <token>" http://localhost:8000/api/exams
@@ -280,6 +282,7 @@ curl -H "Authorization: Bearer <token>" http://localhost:8000/api/exams
 curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d "{\"answers\":{}}" http://localhost:8000/api/attempts/<id>/submit
 ```
 
+- **Đăng nhập API dùng lại `LoginRequest` của Breeze:** cùng rule, cùng giới hạn 5 lần sai theo email và IP, cùng log `auth.login`. `Auth::attempt` chạy trên guard `web`, nhưng nhóm route `api` không có middleware `StartSession`, nên không có session nào được lưu hay cookie nào được gửi về. Admin cũng lấy được token, nhưng các API còn lại vẫn trả 403.
 - **Dùng lại Service, FormRequest, Policy và middleware của web:** API chỉ thêm controller và Resource. Logic chấm điểm chỉ có một chỗ, nên web và API luôn cho cùng một kết quả, và nộp qua API cũng có activity log.
 - **Lỗi ở `/api/*` luôn trả JSON:** khai báo trong `bootstrap/app.php`. Nếu không, client không gửi `Accept: application/json` sẽ bị redirect về `/login` thay vì nhận 401.
 - **`AttemptResource` chỉ trả `questions` khi bài đã nộp:** snapshot chứa đáp án đúng. Sau này có thêm endpoint xem bài đang làm thì đáp án cũng không bị lộ.
@@ -287,13 +290,13 @@ curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/js
 
 #### Postman collection
 
-File [docs/postman/exam-api.postman_collection.json](docs/postman/exam-api.postman_collection.json) có 4 request: lấy danh sách đề, lấy danh sách khi không có token (401), nộp bài (200), nộp lại (422). Mỗi request có test kiểm tra status code và format JSON.
+File [docs/postman/exam-api.postman_collection.json](docs/postman/exam-api.postman_collection.json) có 5 request: đăng nhập, lấy danh sách đề, lấy danh sách khi không có token (401), nộp bài (200), nộp lại (422). Mỗi request có test kiểm tra status code và format JSON. Request đăng nhập tự gán biến `token` cho các request sau.
 
-- **Dùng trong Postman:** Import file, điền biến `token` và `attempt_id` của collection (cách lấy như các bước ở trên), rồi chạy lần lượt từ trên xuống.
+- **Dùng trong Postman:** Import file, điền biến `attempt_id` của collection (cách lấy như bước 3 ở trên), rồi chạy lần lượt từ trên xuống.
 - **Chạy tự động bằng newman,** không cần cài gì trên máy:
 
 ```bash
-docker run --rm --network test_intern_default -v "$PWD/docs/postman:/etc/newman" postman/newman:6-alpine run exam-api.postman_collection.json --env-var base_url=http://nginx --env-var token=<token> --env-var attempt_id=<id>
+docker run --rm --network test_intern_default -v "$PWD/docs/postman:/etc/newman" postman/newman:6-alpine run exam-api.postman_collection.json --env-var base_url=http://nginx --env-var attempt_id=<id>
 ```
 
 Request nộp bài sẽ nộp thật attempt đó. Trên Windows Git Bash, thay `$PWD` bằng `$(pwd -W)` và đặt `MSYS_NO_PATHCONV=1` trước lệnh.
@@ -333,7 +336,7 @@ Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặ
 
 ### Feature test
 
-`docker compose exec app php artisan test` chạy toàn bộ test. CI cũng chạy lại mỗi lần push và mỗi pull request. Hiện có 142 test, tất cả đều pass.
+`docker compose exec app php artisan test` chạy toàn bộ test. CI cũng chạy lại mỗi lần push và mỗi pull request. Hiện có 145 test, tất cả đều pass.
 
 | File | Kiểm tra |
 |---|---|
@@ -383,7 +386,7 @@ Mọi task bắt buộc đều đã xong. Cột "Còn thiếu" ghi những phầ
 | 13 | Trang kết quả | Xong | Chưa có lịch sử làm bài, rời trang rồi chỉ mở lại được kết quả qua URL. |
 | 14 | Thống kê admin | Xong | Chưa cache trang thống kê (task 19 chỉ cache danh sách đề), mỗi lần mở trang chạy 3 aggregation. Chưa lọc theo thời gian. |
 | 15 | Activity log | Xong | Chưa có trang xem log, chỉ xem được trong MongoDB. Chưa ghi thao tác với câu hỏi. |
-| 16 | API REST | Xong | Chưa có endpoint đăng nhập và bắt đầu bài, phải tạo token bằng tinker và bắt đầu bài trên web. |
+| 16 | API REST | Xong | Chưa có endpoint bắt đầu bài, phải bắt đầu bài trên web. |
 | 17 | Tổ chức code | Xong | |
 | 18 | Feature test | Xong | Test giao diện chỉ kiểm tra HTML trả về. Phần JS (autosave, đồng hồ) chưa có test trên trình duyệt. |
 | 19 | Bonus | Xong | Đã làm cache danh sách đề và Postman collection. Không làm Swagger. |
