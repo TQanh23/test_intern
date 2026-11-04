@@ -2,17 +2,29 @@
 
 namespace Tests\Feature;
 
+use App\Models\Document;
 use App\Models\Exam;
 use App\Models\Option;
+use App\Models\Package;
 use App\Models\Question;
+use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DatabaseSeederTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // PackageSeeder ghi file PDF và WAV, giả lập disk để test không ghi vào storage thật.
+        Storage::fake('local');
+    }
 
     public function test_seeder_creates_admin_and_student_accounts(): void
     {
@@ -58,5 +70,22 @@ class DatabaseSeederTest extends TestCase
         $this->assertSame(2, Exam::count());
         $this->assertSame(9, Question::count());
         $this->assertSame(36, Option::count());
+        $this->assertSame(3, Package::count());
+        $this->assertSame(9, Unit::count());
+        $this->assertSame(18, Document::count());
+    }
+
+    public function test_seeder_creates_ielts_packages_with_private_files(): void
+    {
+        $this->seed();
+
+        $this->assertSame([1, 2, 3], Package::orderBy('level')->pluck('level')->all());
+        $this->assertSame(9, Unit::count());
+        $this->assertSame(9, Document::where('type', 'pdf')->where('page_count', 10)->where('preview_pages', 3)->count());
+        $this->assertSame(9, Document::where('type', 'audio')->count());
+
+        foreach (Document::pluck('file_path') as $path) {
+            Storage::disk('local')->assertExists($path);
+        }
     }
 }

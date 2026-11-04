@@ -7,7 +7,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Thống kê tính bằng aggregation của MongoDB trên `attempts`, chỉ đọc snapshot nên đề đã sửa hoặc xóa vẫn đúng.
+ * Thống kê tính bằng aggregation của MongoDB trên `attempts` và `preview_logs`. Chỉ đọc snapshot và tên đã lưu sẵn,
+ * nên đề hay gói đã sửa hoặc xóa vẫn đúng.
  */
 class StatisticsService
 {
@@ -86,13 +87,55 @@ class StatisticsService
     }
 
     /**
+     * 10 gói được xem thử nhiều nhất, đếm trên preview_logs.
+     *
+     * @return Collection<int, array{package_id: int, package_name: string, views: int}>
+     */
+    public function topPreviewedPackages(): Collection
+    {
+        return $this->aggregate([
+            // Sắp theo thời gian để $last lấy tên gói ở lượt xem gần nhất.
+            ['$sort' => ['created_at' => 1]],
+            ['$group' => [
+                '_id' => '$package_id',
+                'package_name' => ['$last' => '$package_name'],
+                'views' => ['$sum' => 1],
+            ]],
+            ['$sort' => ['views' => -1, '_id' => 1]],
+            ['$limit' => 10],
+            ['$project' => ['_id' => 0, 'package_id' => '$_id', 'package_name' => 1, 'views' => 1]],
+        ], 'preview_logs');
+    }
+
+    /**
+     * 10 tài liệu được xem thử nhiều nhất, đếm trên preview_logs.
+     *
+     * @return Collection<int, array{document_id: int, document_title: string, package_name: string, views: int}>
+     */
+    public function topPreviewedDocuments(): Collection
+    {
+        return $this->aggregate([
+            ['$sort' => ['created_at' => 1]],
+            ['$group' => [
+                '_id' => '$document_id',
+                'document_title' => ['$last' => '$document_title'],
+                'package_name' => ['$last' => '$package_name'],
+                'views' => ['$sum' => 1],
+            ]],
+            ['$sort' => ['views' => -1, '_id' => 1]],
+            ['$limit' => 10],
+            ['$project' => ['_id' => 0, 'document_id' => '$_id', 'document_title' => 1, 'package_name' => 1, 'views' => 1]],
+        ], 'preview_logs');
+    }
+
+    /**
      * Gọi thẳng collection để nhận mảng PHP thường. Attempt::raw() sẽ biến mỗi dòng thành model Attempt.
      *
      * @param  list<array<string, mixed>>  $pipeline
      */
-    private function aggregate(array $pipeline): Collection
+    private function aggregate(array $pipeline, string $collection = 'attempts'): Collection
     {
-        $cursor = DB::connection('mongodb')->getCollection('attempts')->aggregate($pipeline, [
+        $cursor = DB::connection('mongodb')->getCollection($collection)->aggregate($pipeline, [
             'typeMap' => ['root' => 'array', 'document' => 'array', 'array' => 'array'],
         ]);
 

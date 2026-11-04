@@ -33,7 +33,11 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Tắt route /storage/{path} của disk private: file gốc không có URL nào, và tránh lỗi PKSA-m5cs-t1y6-qpcs.
+            'serve' => false,
+            // Thư mục mặc định 0700: seed chạy bằng root thì php-fpm (www-data) không đọc được file. 0755 chỉ mở quyền đọc
+            // trên máy chủ, không tạo URL nào.
+            'directory_visibility' => 'public',
             'throw' => false,
             'report' => false,
         ],
