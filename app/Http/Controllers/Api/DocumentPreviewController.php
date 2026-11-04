@@ -7,7 +7,7 @@ use App\Models\Document;
 use App\Services\PreviewService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DocumentPreviewController extends Controller
 {
@@ -21,9 +21,9 @@ class DocumentPreviewController extends Controller
     /**
      * Middleware `signed` đã từ chối link sai chữ ký hoặc hết hạn bằng 403 trước khi vào đây.
      */
-    public function file(Document $document): Response
+    public function file(Document $document): BinaryFileResponse
     {
-        return response($this->previewService->render($document), 200, [
+        return response()->file($this->previewService->previewPath($document), [
             'Content-Type' => $document->type === 'pdf' ? 'application/pdf' : 'audio/wav',
             'Content-Disposition' => 'inline',
             'Cache-Control' => 'private, no-store',

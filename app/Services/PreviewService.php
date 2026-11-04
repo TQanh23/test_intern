@@ -34,10 +34,28 @@ class PreviewService
     }
 
     /**
-     * Đọc file gốc trong storage private rồi trả về bản cắt.
-     * shortcut: cắt lại mỗi lần mở link, đủ nhanh với file mẫu; file thật lớn thì nên cắt sẵn một lần lúc upload.
+     * Đường dẫn bản cắt trong storage private. Lần đầu mở thì cắt rồi lưu lại, các lần sau dùng luôn file đó.
+     * Trả về file thật để response()->file() hỗ trợ request Range: thiếu Range thì trình duyệt không cho tua audio.
+     * Tên file có updated_at nên sửa tài liệu (ví dụ đổi preview_pages) sẽ tạo bản cắt mới.
+     * shortcut: bản cắt cũ không bị xoá khi tài liệu đổi; khi có upload thật thì xoá trong lúc cập nhật tài liệu.
      */
-    public function render(Document $document): string
+    public function previewPath(Document $document): string
+    {
+        $extension = $document->type === 'pdf' ? 'pdf' : 'wav';
+        $path = "previews/{$document->id}-{$document->updated_at->timestamp}.{$extension}";
+        $disk = Storage::disk('local');
+
+        if (! $disk->exists($path)) {
+            $disk->put($path, $this->render($document));
+        }
+
+        return $disk->path($path);
+    }
+
+    /**
+     * Đọc file gốc trong storage private rồi trả về bản cắt.
+     */
+    private function render(Document $document): string
     {
         $original = Storage::disk('local')->get($document->file_path);
 

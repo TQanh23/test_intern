@@ -10,6 +10,7 @@ use Database\Seeders\Support\SampleFiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use setasign\Fpdi\Fpdi;
 use setasign\Fpdi\PdfParser\StreamReader;
@@ -82,17 +83,24 @@ class DocumentPreviewApiTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'application/pdf');
 
-        $pages = (new Fpdi)->setSourceFile(StreamReader::createByString($response->getContent()));
+        $pages = (new Fpdi)->setSourceFile(StreamReader::createByString($this->body($response)));
 
         $this->assertSame(3, $pages);
     }
 
+    /**
+     * Response là file (BinaryFileResponse) nên getContent() trả false, phải đọc file mà nó trỏ tới.
+     */
+    private function body(TestResponse $response): string
+    {
+        return file_get_contents($response->baseResponse->getFile()->getPathname());
+    }
+
     public function test_audio_preview_is_cut_to_15_seconds(): void
     {
-        $body = $this->get($this->previewUrl($this->audio))
+        $body = $this->body($this->get($this->previewUrl($this->audio))
             ->assertOk()
-            ->assertHeader('Content-Type', 'audio/wav')
-            ->getContent();
+            ->assertHeader('Content-Type', 'audio/wav'));
 
         $dataBytes = SampleFiles::WAV_SAMPLE_RATE * 15;
 
@@ -100,6 +108,25 @@ class DocumentPreviewApiTest extends TestCase
         // Hai trường kích thước trong header phải khớp phần dữ liệu đã cắt, nếu không trình phát đọc sai độ dài.
         $this->assertSame(36 + $dataBytes, unpack('V', substr($body, 4, 4))[1]);
         $this->assertSame($dataBytes, unpack('V', substr($body, 40, 4))[1]);
+    }
+
+    public function test_preview_supports_range_requests_so_audio_can_seek(): void
+    {
+        // Không hỗ trợ Range thì trình duyệt không cho tua thanh audio.
+        $this->get($this->previewUrl($this->audio), ['Range' => 'bytes=0-99'])
+            ->assertStatus(206)
+            ->assertHeader('Accept-Ranges', 'bytes')
+            ->assertHeader('Content-Length', '100');
+    }
+
+    public function test_preview_is_cut_once_and_reused(): void
+    {
+        $url = $this->previewUrl($this->pdf);
+
+        $this->get($url)->assertOk();
+        $this->get($url)->assertOk();
+
+        $this->assertCount(1, Storage::disk('local')->files('previews'));
     }
 
     public function test_expired_url_gets_403(): void
