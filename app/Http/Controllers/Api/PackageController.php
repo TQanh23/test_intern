@@ -15,7 +15,9 @@ class PackageController extends Controller
 
     public function index(PackageIndexRequest $request): AnonymousResourceCollection
     {
-        return PackageResource::collection($this->packageService->paginate($request->integer('level') ?: null));
+        return PackageResource::collection(
+            $this->packageService->paginate($request->integer('level') ?: null, $request->string('q')->value())
+        );
     }
 
     public function show(Package $package): PackageResource

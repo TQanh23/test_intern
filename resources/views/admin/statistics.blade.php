@@ -5,7 +5,10 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
-            <p class="px-4 sm:px-0 text-sm text-gray-600">Chỉ tính bài đã nộp. Tỷ lệ đúng = số câu đúng / tổng số câu của bài.</p>
+            <p class="px-4 sm:px-0 text-sm text-gray-600">
+                Chỉ tính bài đã nộp. Tỷ lệ đúng = số câu đúng / tổng số câu của bài.
+                <a href="{{ route('admin.preview-statistics') }}" class="font-medium text-indigo-600 hover:text-indigo-800">Xem lượt xem thử gói IELTS →</a>
+            </p>
 
             <section class="space-y-3">
                 <h3 class="px-4 sm:px-0 font-semibold text-gray-800">Tỷ lệ đúng trung bình theo đề</h3>

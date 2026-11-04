@@ -15,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Trang web gọi /api bằng cookie session (cùng domain, có kiểm tra CSRF), không phải lưu token trong JS.
+        // Client gửi Bearer token như Postman vẫn chạy như cũ.
+        $middleware->statefulApi();
+
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
             'student' => EnsureUserIsStudent::class,

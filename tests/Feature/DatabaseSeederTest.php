@@ -87,5 +87,11 @@ class DatabaseSeederTest extends TestCase
         foreach (Document::pluck('file_path') as $path) {
             Storage::disk('local')->assertExists($path);
         }
+
+        // Ảnh bìa nằm trong public/ và được commit, không do seeder sinh ra.
+        foreach (Package::all() as $package) {
+            $this->assertGreaterThan(0, $package->price);
+            $this->assertFileExists(public_path($package->cover_image));
+        }
     }
 }

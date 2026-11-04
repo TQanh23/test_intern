@@ -21,6 +21,7 @@ class PackageIndexRequest extends FormRequest
     {
         return [
             'level' => ['nullable', 'integer', 'in:1,2,3'],
+            'q' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

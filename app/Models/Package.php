@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Package extends Model
 {
@@ -16,6 +17,8 @@ class Package extends Model
         'name',
         'slug',
         'level',
+        'price',
+        'cover_image',
         'description',
     ];
 
@@ -25,5 +28,15 @@ class Package extends Model
     public function units(): HasMany
     {
         return $this->hasMany(Unit::class);
+    }
+
+    /**
+     * Tài liệu đi qua unit, để withCount('documents') đếm bằng một subquery.
+     *
+     * @return HasManyThrough<Document, Unit, $this>
+     */
+    public function documents(): HasManyThrough
+    {
+        return $this->hasManyThrough(Document::class, Unit::class);
     }
 }

@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Ẩn phần tử Alpine chưa khởi tạo xong, tránh nháy trạng thái lỗi/rỗng lúc tải trang. */
+[x-cloak] {
+    display: none !important;
+}
