@@ -25,6 +25,8 @@
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="MONGODB_DATABASE" value="exam_testing"/>
+        <!-- Test chạy bằng root. Biên dịch view vào thư mục riêng để php-fpm (www-data) vẫn ghi đè được view của web. -->
+        <env name="VIEW_COMPILED_PATH" value="storage/framework/testing/views"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
