@@ -1,8 +1,11 @@
 <?php
 
 use App\Http\Controllers\Api\AttemptController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ExamController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/login', [AuthController::class, 'login']);
 
 // Dùng lại middleware `student` và policy của web, chỉ đổi cách đăng nhập sang token Sanctum.
 Route::middleware(['auth:sanctum', 'student'])->group(function () {
