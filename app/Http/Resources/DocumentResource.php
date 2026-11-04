@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Document;
+use App\Services\PreviewService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -24,6 +25,8 @@ class DocumentResource extends JsonResource
             'type' => $this->type,
             'page_count' => $this->page_count,
             'preview_pages' => $this->preview_pages,
+            // Lấy từ PreviewService để giao diện không phải tự ghi lại con số 15.
+            'preview_seconds' => $this->type === 'audio' ? PreviewService::AUDIO_PREVIEW_SECONDS : null,
         ];
     }
 }

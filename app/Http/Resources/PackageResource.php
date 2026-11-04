@@ -23,7 +23,11 @@ class PackageResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'level' => $this->level,
+            'price' => $this->price,
+            'cover_url' => $this->cover_image ? asset($this->cover_image) : null,
             'description' => $this->description,
+            // Chỉ danh sách gọi withCount('documents'); trang chi tiết đếm từ units.
+            'documents_count' => $this->whenCounted('documents'),
             'units' => UnitResource::collection($this->whenLoaded('units')),
         ];
     }

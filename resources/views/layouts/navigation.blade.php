@@ -25,6 +25,9 @@
                             Làm bài
                         </x-nav-link>
                     @endif
+                    <x-nav-link :href="route('packages.index')" :active="request()->routeIs('packages.*')">
+                        Gói IELTS
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -90,6 +93,9 @@
                     Làm bài
                 </x-responsive-nav-link>
             @endif
+            <x-responsive-nav-link :href="route('packages.index')" :active="request()->routeIs('packages.*')">
+                Gói IELTS
+            </x-responsive-nav-link>
         </div>
 
         <!-- Responsive Settings Options -->

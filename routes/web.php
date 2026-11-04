@@ -22,6 +22,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     })->name('dashboard');
 
     Route::get('statistics', [StatisticsController::class, 'index'])->name('statistics');
+    // Trang chỉ là khung, Alpine lấy số liệu từ /api/admin/preview-stats.
+    Route::view('preview-statistics', 'admin.preview-statistics')->name('preview-statistics');
     Route::resource('exams', ExamController::class)->except('show');
     Route::resource('exams.questions', QuestionController::class)->shallow()->except(['index', 'show']);
 });
@@ -44,6 +46,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Gói IELTS: Blade chỉ dựng khung, dữ liệu do Alpine gọi API. Route::view truyền {slug} vào view thành $slug.
+    Route::view('/packages', 'packages.index')->name('packages.index');
+    Route::view('/packages/{slug}', 'packages.show')->name('packages.show');
 });
 
 require __DIR__.'/auth.php';

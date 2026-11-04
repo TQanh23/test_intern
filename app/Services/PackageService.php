@@ -8,14 +8,15 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 class PackageService
 {
     /**
-     * Danh sách gói, lọc theo level nếu có.
+     * Danh sách gói, lọc theo level và tìm theo tên nếu có, kèm số tài liệu của mỗi gói.
      *
      * @return LengthAwarePaginator<int, Package>
      */
-    public function paginate(?int $level): LengthAwarePaginator
+    public function paginate(?int $level, string $search = ''): LengthAwarePaginator
     {
-        return Package::query()
+        return Package::withCount('documents')
             ->when($level, fn ($query) => $query->where('level', $level))
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->orderBy('level')
             ->orderBy('id')
             ->paginate(10)

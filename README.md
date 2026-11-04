@@ -2,7 +2,7 @@
 
 Bài test Laravel 11 dùng MySQL 8 và MongoDB 7, chạy bằng Docker.
 
-**Trạng thái hiện tại:** đã xong task 1–21, gồm cả bonus (task 19), task nâng cao 20 (autosave) và 21 (backend gói IELTS). Không làm task 22 (giao diện gói IELTS) vì đề chỉ yêu cầu 1 trong 3 task nâng cao. Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
+**Trạng thái hiện tại:** đã xong cả 22 task, gồm bonus (task 19) và cả 3 task nâng cao: 20 (autosave), 21 (backend gói IELTS), 22 (giao diện gói IELTS). Chi tiết ở mục [Những gì chưa làm được và vì sao](#những-gì-chưa-làm-được-và-vì-sao).
 
 ## Chạy dự án
 
@@ -31,7 +31,7 @@ Nếu trùng cổng, sửa phần `ports` trong `docker-compose.yml`. App không
 
 Seeder cũng tạo 2 đề: "Toán cơ bản" (15 phút, 5 câu) và "Tiếng Anh cơ bản" (10 phút, 4 câu), mỗi câu có 4 đáp án. Câu hỏi viết tay để biết trước đáp án đúng khi kiểm tra điểm. Các tài khoản này chỉ dùng cho dev và demo.
 
-Seeder còn tạo 3 gói "Mindset for IELTS Level 1/2/3", mỗi gói 3 unit, mỗi unit một PDF 10 trang (xem thử 3 trang) và một file WAV 60 giây. File do code tự sinh ([SampleFiles](database/seeders/Support/SampleFiles.php)): PDF chỉ ghi tiêu đề và số trang, audio là tiếng bíp 400 Hz. Không dùng bản scan sách thật. File nằm ở `storage/app/private/documents`.
+Seeder còn tạo 3 gói "Mindset for IELTS Level 1/2/3", mỗi gói 3 unit, mỗi unit một PDF 10 trang (xem thử 3 trang) và một file WAV 60 giây. File do code tự sinh ([SampleFiles](database/seeders/Support/SampleFiles.php)): PDF chỉ ghi tiêu đề và số trang, audio là tiếng bíp 400 Hz. Không dùng bản scan sách thật. File nằm ở `storage/app/private/documents`. Mỗi gói có giá (199.000 ₫, 249.000 ₫, 299.000 ₫) và ảnh bìa SVG tự vẽ ở `public/images/packages`.
 
 Đăng nhập tại <http://localhost:8000/login>. Trang quản trị ở `/admin`, chỉ tài khoản admin mở được.
 
@@ -350,12 +350,12 @@ Request nộp bài sẽ nộp thật attempt đó. Trên Windows Git Bash, thay 
 
 ### Gói IELTS và xem thử
 
-Mọi tài khoản đã đăng nhập (admin hoặc student) đều gọi được, trừ API thống kê chỉ dành cho admin.
+Mọi tài khoản đã đăng nhập (admin hoặc student) đều gọi được, trừ API thống kê chỉ dành cho admin. Gọi bằng Bearer token (Postman, curl) hoặc cookie session (trang web, xem mục [Giao diện gói IELTS](#giao-diện-gói-ielts)).
 
 | Method | URL | Thành công | Lỗi |
 |---|---|---|---|
-| GET | `/api/packages?level=1` | 200: `data` (`id`, `name`, `slug`, `level`, `description`), `links`, `meta`; 10 gói mỗi trang. `level` không bắt buộc | 401; 422 nếu `level` không phải 1, 2, 3 |
-| GET | `/api/packages/{slug}` | 200: gói kèm `units` (theo `position`), mỗi unit có `documents` (`id`, `title`, `type`, `page_count`, `preview_pages`) | 401, 404 |
+| GET | `/api/packages?level=1&q=mindset` | 200: `data` (`id`, `name`, `slug`, `level`, `price`, `cover_url`, `description`, `documents_count`), `links`, `meta`; 10 gói mỗi trang. `level` và `q` (tìm theo tên) không bắt buộc | 401; 422 nếu `level` không phải 1, 2, 3 hoặc `q` dài quá 100 ký tự |
+| GET | `/api/packages/{slug}` | 200: gói kèm `units` (theo `position`), mỗi unit có `documents` (`id`, `title`, `type`, `page_count`, `preview_pages`, `preview_seconds`) | 401, 404 |
 | POST | `/api/documents/{id}/preview` | 200: `data.url` (link có chữ ký, hạn 5 phút), `data.expires_at`. Ghi một dòng `preview_logs` | 401, 404; 429 nếu quá 10 lần mỗi phút |
 | GET | `data.url` ở trên | 200: PDF chỉ có `preview_pages` trang đầu, hoặc WAV 15 giây đầu. Không cần token | 403 nếu sai chữ ký, sửa URL hoặc hết hạn; 429 nếu quá 60 lần mỗi phút |
 | GET | `/api/admin/preview-stats` | 200: `data.packages` (`package_id`, `package_name`, `views`), `data.documents` (`document_id`, `document_title`, `package_name`, `views`), mỗi loại top 10 | 401; 403 nếu không phải admin |
@@ -364,7 +364,7 @@ Mọi tài khoản đã đăng nhập (admin hoặc student) đều gọi đư�
 - **Link xem thử dùng `URL::temporarySignedRoute`:** chữ ký tính trên toàn bộ URL gồm id tài liệu và `expires`. Sửa bất kỳ phần nào hoặc quá hạn thì middleware `signed` trả 403. Link không cần token vì pdf.js và thẻ `<audio>` (task 22) mở link trực tiếp, không gửi được header `Authorization`. Chữ ký thay cho đăng nhập.
 - **Cắt PDF bằng FPDI** (`setasign/fpdi` + `setasign/fpdf`): chép `preview_pages` trang đầu sang một PDF mới. Cắt trang buộc phải đọc được cấu trúc PDF, tự viết thì dài và khó kiểm tra. FPDF cũng dùng để seeder tạo PDF mẫu. FPDI bản miễn phí không đọc được PDF nén cross-reference (PDF 1.5 trở lên). File seeder tạo thì đọc được, còn file PDF thật thì có thể cần bản trả phí hoặc chuyển đổi trước.
 - **Audio dùng WAV, không dùng MP3:** cắt WAV chỉ là giữ header 44 byte, lấy `byte rate × 15` byte dữ liệu đầu rồi sửa hai trường kích thước trong header. Không cần cài `ffmpeg` vào image. Đổi lại file nặng hơn, khoảng 480 KB cho 60 giây ở 8 kHz mono 8-bit.
-- **Cắt lại mỗi lần mở link:** file mẫu nhỏ nên vẫn nhanh. Với file thật lớn thì nên cắt sẵn một lần lúc upload.
+- **Cắt một lần rồi lưu lại:** lần mở đầu tiên cắt file và lưu vào `storage/app/private/previews/{id}-{updated_at}.{pdf|wav}`, các lần sau trả luôn file đó bằng `response()->file()`. Trả về file thật thì Laravel (Symfony `BinaryFileResponse`) tự hỗ trợ request `Range` (206). Thiếu Range thì trình duyệt không cho tua thanh audio. Lỗi này chỉ lộ ra khi làm giao diện ở task 22. Tên file có `updated_at` nên sửa tài liệu sẽ tạo bản cắt mới; bản cũ chưa được xoá.
 - **Ghi log lúc cấp link, không ghi lúc tải file:** một lượt xem thử là một lần bấm nút. Mở lại link cũ trong 5 phút không tính thêm lượt. Log ghi qua event `DocumentPreviewed` và listener `RecordActivity`, không ghi trong controller.
 - **Rate limit:** limiter `preview` (10 link mỗi phút cho mỗi user) khai báo trong `AppServiceProvider`. Route tải file không có user nên dùng `throttle:60,1` theo IP, để một link còn hạn không bị tải liên tục.
 - **Thống kê đếm trên `preview_logs`:** `$group` theo `package_id` hoặc `document_id`, đếm số dòng, lấy tên ở lượt xem gần nhất, xếp giảm dần, lấy 10. Nằm trong `StatisticsService` cùng các thống kê khác.
@@ -380,6 +380,37 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" htt
 curl -o preview.pdf "<data.url ở trên, bỏ các dấu \ trước />"   # PDF 3 trang
 curl -i http://localhost:8000/storage/documents/level-1/unit-1.pdf   # 404
 ```
+
+### Giao diện gói IELTS
+
+| Trang | Nội dung |
+|---|---|
+| `/packages` | Card gói (ảnh bìa, level, tên, số tài liệu, giá), lọc theo level, ô tìm kiếm, phân trang |
+| `/packages/{slug}` | Ảnh bìa, mô tả, giá, mục lục theo Unit dạng accordion; mỗi tài liệu có icon PDF/audio, icon khoá và nút Xem thử |
+| Modal xem thử | PDF vẽ bằng pdf.js: chuyển trang, zoom 25–300%, tự khớp bề rộng màn hình. Qua trang cuối của bản xem thử thì báo mua gói. Audio dùng thẻ `<audio>`, nghe hết đoạn thử thì báo mua gói |
+| `/admin/preview-statistics` | Top 10 gói và tài liệu được xem thử nhiều nhất, có thanh so sánh. Chỉ admin vào được |
+
+Link "Gói IELTS" ở thanh menu, cho mọi tài khoản. Trang quản trị và trang thống kê có link sang trang lượt xem thử.
+
+- **Blade + Alpine.js, không dùng Vue/React (Inertia):** Breeze đã cài sẵn Alpine, Tailwind và axios, nên không thêm router hay bước build mới. Blade chỉ dựng khung trang (`Route::view`), Alpine gọi API rồi hiển thị. Chỉ thêm một package là `pdfjs-dist`.
+- **Trang web gọi API bằng cookie session:** `bootstrap/app.php` bật `statefulApi()` (chế độ SPA của Sanctum). Request từ `localhost:8000` dùng session đăng nhập web, axios tự gửi header `X-XSRF-TOKEN`, nên JS không phải giữ token. Postman và curl vẫn dùng Bearer token như cũ.
+- **Component tách theo việc:**
+
+  | File | Vai trò |
+  |---|---|
+  | [resources/js/ielts/api.js](resources/js/ielts/api.js) | Mọi lời gọi API, và hàm đổi lỗi kỹ thuật thành câu dễ hiểu (mất mạng, 403, 404, 429...) |
+  | [resources/js/ielts/format.js](resources/js/ielts/format.js) | Định dạng giá VND, màu theo level, mô tả tài liệu |
+  | `ielts/package-list.js`, `package-detail.js`, `preview-modal.js`, `preview-stats.js` | Component Alpine của từng trang, đăng ký trong [resources/js/app.js](resources/js/app.js) |
+  | [components/async-state.blade.php](resources/views/components/async-state.blade.php) | Bốn trạng thái loading (skeleton), lỗi (nút Thử lại), rỗng, có dữ liệu. Dùng ở cả 3 trang và modal |
+  | `components/ielts/package-card`, `file-icon`, `preview-modal` | Card gói, icon loại file, modal xem thử. Modal mở bằng event `preview-document` nên trang nào cũng gắn được |
+
+- **Xem thử không reload trang:** bấm Xem thử thì gọi `POST /api/documents/{id}/preview` bằng axios, rồi mở link có chữ ký trong modal.
+- **pdf.js chỉ tải khi mở PDF lần đầu** (`import()` động). Thư viện và worker nằm ở file riêng, khoảng 1,7 MB, nên trang danh sách không phải tải.
+- **Object PDF của pdf.js không nằm trong state của Alpine:** Alpine bọc state bằng Proxy, làm hỏng private field của pdf.js. Mở tài liệu khác hoặc đóng modal giữa chừng thì kết quả của lần mở cũ bị bỏ qua. Đóng modal thì dừng audio và giải phóng PDF.
+- **Mọi tài liệu đều hiện icon khoá:** dự án chưa có chức năng mua gói, nên chưa ai mở khoá tài liệu nào. Phần được xem là bản xem thử. Khi có bảng mua gói thì API trả thêm cờ đã mở khoá.
+- **Nginx trả `.mjs` với MIME JavaScript:** worker của pdf.js là file `.mjs`, nhưng `mime.types` mặc định của nginx không có đuôi này, nên file bị trả về là `application/octet-stream` và trình duyệt từ chối chạy. [docker/nginx/default.conf](docker/nginx/default.conf) có thêm một `location` cho `.mjs`.
+- **Trình duyệt:** pdf.js 4.x cần Chrome/Edge 119+, Firefox 121+ hoặc Safari 17.4+.
+- **Kiểm tra trên trình duyệt thật:** dự án không có test JS tự động. Lúc làm, giao diện được kiểm tra bằng Chromium headless (puppeteer) ở bề rộng 1280 px và 375 px: lọc, tìm kiếm, rỗng, mất mạng rồi thử lại, skeleton, accordion, modal PDF (trang 1 → 3, zoom, thông báo mua gói), audio 15 giây, lỗi 429, không có thanh cuộn ngang trên mobile và không có lỗi JS. Script kiểm tra không nằm trong repo.
 
 ### Cache danh sách đề
 
@@ -400,6 +431,7 @@ Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặ
 | Logic nghiệp vụ | `app/Services` | `AttemptService` (bắt đầu bài, autosave, chấm điểm, chấm bài bỏ dở), `ExamService` (danh sách đề có cache, tạo và sửa câu hỏi), `StatisticsService`, `PackageService`, `PreviewService` (cấp link, cắt PDF và audio) |
 | Validate | FormRequest | `ExamRequest`, `QuestionRequest`, `SubmitAttemptRequest`, `SaveAnswerRequest`, `PackageIndexRequest` |
 | Response API | API Resource | `ExamResource`, `AttemptResource`, `PackageResource`, `UnitResource`, `DocumentResource` |
+| Giao diện gọi API | Component Alpine + Blade component | `packageList`, `packageDetail`, `previewModal`, `previewStats`, `x-async-state` |
 | Phân quyền | Middleware, Policy | `admin`, `student`, `AttemptPolicy` |
 | Ghi log, xóa cache | Event/Listener, Observer | `RecordActivity`, `ExamObserver`, `ExamListCacheObserver` |
 | Lệnh định kỳ | Command, chỉ gọi Service | `app:close-expired-attempts` |
@@ -410,6 +442,7 @@ Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặ
   - trang sửa câu hỏi: `load('options')`
   - danh sách đề: `withCount('questions')`, không đếm theo từng đề
   - thống kê: một query `whereIn` lấy tên cho cả 10 học sinh
+  - danh sách gói: `withCount('documents')` qua quan hệ `hasManyThrough` (gói → unit → tài liệu), một subquery cho cả trang
   - chi tiết gói: `load('units', 'units.documents')`, hai query cho cả cây
   - cấp link xem thử: `load('unit.package')` để listener lấy tên gói
 
@@ -418,7 +451,7 @@ Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặ
 
 ### Feature test
 
-`docker compose exec app php artisan test` chạy toàn bộ test. CI cũng chạy lại mỗi lần push và mỗi pull request. Hiện có 163 test, tất cả đều pass.
+`docker compose exec app php artisan test` chạy toàn bộ test. CI cũng chạy lại mỗi lần push và mỗi pull request. Hiện có 172 test, tất cả đều pass.
 
 | File | Kiểm tra |
 |---|---|
@@ -428,7 +461,8 @@ Controller chỉ nhận request, gọi Service, rồi trả view, redirect hoặ
 | `CloseExpiredAttemptsTest` | Command chấm bài bỏ dở, lịch chạy mỗi phút |
 | `Api/ExamApiTest`, `Api/SubmitAttemptApiTest` | Format response và status code 200, 401, 403, 404, 422 |
 | `Api/DocumentPreviewApiTest` | Link có chữ ký, PDF đúng số trang xem thử, WAV đúng 15 giây, link hết hạn hoặc bị sửa trả 403, file gốc không có URL, ghi `preview_logs`, rate limit 429 |
-| `Api/PackageApiTest`, `Api/PreviewStatisticsApiTest` | Lọc level, phân trang, mục lục theo unit, 404, 422; thống kê lượt xem khớp dữ liệu biết trước, student bị 403 |
+| `Api/PackageApiTest`, `Api/PreviewStatisticsApiTest` | Lọc level, tìm theo tên, giá, ảnh bìa, số tài liệu đếm qua unit, phân trang, mục lục theo unit, 404, 422; thống kê lượt xem khớp dữ liệu biết trước, student bị 403 |
+| `PackagePagesTest` | Khách bị chuyển về đăng nhập, student và admin mở được trang gói, chỉ admin mở được trang lượt xem thử, menu có link |
 | `Admin/ExamManagementTest`, `Admin/QuestionManagementTest` | CRUD, tìm kiếm, phân trang, validate, eager loading |
 | `Admin/StatisticsTest` | 3 số liệu thống kê với dữ liệu biết trước điểm |
 | `ActivityLogTest`, `ExamListCacheTest` | Log qua Event/Observer, cache và xóa cache |
@@ -475,8 +509,8 @@ Mọi task bắt buộc đều đã xong. Cột "Còn thiếu" ghi những phầ
 | 18 | Feature test | Xong | Test giao diện chỉ kiểm tra HTML trả về. Phần JS (autosave, đồng hồ) chưa có test trên trình duyệt. |
 | 19 | Bonus | Xong | Đã làm cache danh sách đề và Postman collection. Không làm Swagger. |
 | 20 | Autosave và tiếp tục bài | Xong | Chỉ có trên web, API chưa có autosave. Mất mạng lúc chọn đáp án thì chỉ báo "Chưa lưu được", không tự gửi lại. Bài bỏ dở được chấm trễ tối đa khoảng 1 phút. |
-| 21 | Gói IELTS (backend) | Xong | Chỉ cắt được WAV và PDF dạng FPDI bản miễn phí đọc được (như file seeder tạo), chưa hỗ trợ MP3 hay PDF 1.5+. Chưa có API upload hoặc CRUD gói. Bản xem thử được cắt lại mỗi lần mở link. |
-| 22 | Gói IELTS (giao diện) | Chưa làm | Đề yêu cầu làm ít nhất 1 trong 3 task 20–22, đã làm task 20 và 21. |
+| 21 | Gói IELTS (backend) | Xong | Chỉ cắt được WAV và PDF dạng FPDI bản miễn phí đọc được (như file seeder tạo), chưa hỗ trợ MP3 hay PDF 1.5+. Chưa có API upload hoặc CRUD gói. Bản cắt cũ không tự xoá khi tài liệu thay đổi. |
+| 22 | Gói IELTS (giao diện) | Xong | Chưa có chức năng mua gói, nên mọi tài liệu đều khoá. Bộ lọc không lưu trên URL, tải lại trang thì về mặc định. Không có test JS tự động, giao diện được kiểm tra bằng trình duyệt headless lúc làm. |
 
 Các hạn chế khác:
 

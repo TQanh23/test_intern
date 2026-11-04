@@ -14,6 +14,8 @@ class PackageSeeder extends Seeder
 {
     private const UNITS = ['Daily life', 'Education', 'Environment'];
 
+    private const PRICES = [1 => 199000, 2 => 249000, 3 => 299000];
+
     public function run(): void
     {
         $wav = SampleFiles::wav(60);
@@ -23,6 +25,9 @@ class PackageSeeder extends Seeder
             $package = Package::updateOrCreate(['slug' => "mindset-for-ielts-level-{$level}"], [
                 'name' => "Mindset for IELTS Level {$level}",
                 'level' => $level,
+                'price' => self::PRICES[$level],
+                // Ảnh bìa SVG tự vẽ, commit sẵn trong public/images/packages.
+                'cover_image' => "images/packages/level-{$level}.svg",
                 'description' => "Tài liệu mẫu tự tạo cho level {$level}: mỗi unit có một bài đọc PDF và một bài nghe.",
             ]);
 

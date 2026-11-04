@@ -10,12 +10,15 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
                     <p>Xin chào {{ auth()->user()->name }}. Chỉ tài khoản admin mới vào được trang này.</p>
-                    <div class="mt-4 flex gap-6">
+                    <div class="mt-4 flex flex-wrap gap-x-6 gap-y-2">
                         <a href="{{ route('admin.exams.index') }}" class="font-medium text-indigo-600 hover:text-indigo-800">
                             Quản lý đề thi
                         </a>
                         <a href="{{ route('admin.statistics') }}" class="font-medium text-indigo-600 hover:text-indigo-800">
                             Thống kê
+                        </a>
+                        <a href="{{ route('admin.preview-statistics') }}" class="font-medium text-indigo-600 hover:text-indigo-800">
+                            Lượt xem thử gói IELTS
                         </a>
                     </div>
                 </div>
