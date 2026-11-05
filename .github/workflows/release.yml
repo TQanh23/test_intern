@@ -1,0 +1,37 @@
+name: Release
+
+# Push tag v* (ví dụ v1.0.0) lên commit đã có trên main để đưa bản đó lên production.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Environment production chỉ nhận tag v*. Repo private gói Free không có Required reviewers, nên push tag là bước duyệt.
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Không build lại: gắn tag production và tên version vào đúng image job publish đã build và chạy thử cho commit này.
+      # Commit chưa qua publish thì không có image <sha>, lệnh lỗi và không có gì lên production.
+      - name: Gắn tag production
+        run: |
+          for name in app web; do
+            image=ghcr.io/tqanh23/test_intern-$name
+            docker buildx imagetools create \
+              -t "$image:production" \
+              -t "$image:${{ github.ref_name }}" \
+              "$image:${{ github.sha }}"
+          done

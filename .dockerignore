@@ -1,0 +1,21 @@
+# Không đưa vào image: file của máy dev, secret và file sinh ra lúc chạy.
+.git
+.github
+.claude
+node_modules
+vendor
+public/build
+public/hot
+.env
+.env.*
+!.env.example
+# packages.php trên máy dev có cả package dev, image tự tạo lại khi dump-autoload.
+bootstrap/cache/*.php
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/testing/*
+storage/app/private/*
+storage/app/public/*
+!storage/**/.gitignore

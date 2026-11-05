@@ -1,6 +1,9 @@
 services:
   app:
-    build: ./docker/php
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: base
     volumes:
       - .:/var/www/html
       # Bind-mounted vendor takes ~14s per request on Windows, so it lives in a volume.
@@ -23,7 +26,10 @@ services:
   # Chạy lệnh định kỳ trong routes/console.php, ví dụ chấm bài hết giờ mà học sinh bỏ dở.
   # Entrypoint chỉ cài dependency và migrate khi chạy php-fpm, nên container này đợi app sẵn sàng rồi dùng chung code và vendor.
   scheduler:
-    build: ./docker/php
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: base
     command: php artisan schedule:work
     volumes:
       - .:/var/www/html
