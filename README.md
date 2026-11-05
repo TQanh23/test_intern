@@ -217,6 +217,31 @@ GitHub Actions chạy [.github/workflows/ci.yml](.github/workflows/ci.yml) cho m
 - **Dùng lại Docker Compose, không cài PHP riêng trên runner:** `docker compose up -d` chạy đúng luồng của người dùng thật, nên kiểm tra luôn việc cài dependency, build frontend, migrate và seed trên MySQL. Không phải khai báo lại phiên bản PHP, extension và service ở hai nơi. Đổi lại mỗi lần chạy lâu hơn vì phải build image.
 - **Các bước kiểm tra:** Pint, toàn bộ test, rồi mở `/login` bằng `curl`. Test gọi `withoutVite()` nên bước `curl` mới phát hiện được lỗi 500 khi thiếu `public/build`.
 
+### CD
+
+Không có server, nên CD dừng ở bước đẩy image lên GitHub Container Registry (GHCR). Có 2 image: `ghcr.io/tqanh23/test_intern-app` (PHP-FPM, có sẵn code, `vendor` không có package dev và `public/build`) và `ghcr.io/tqanh23/test_intern-web` (nginx, chỉ chứa `public`). Cả hai build từ [docker/php/Dockerfile](docker/php/Dockerfile): dev dùng stage `base`, image production dùng stage `prod` và `web`.
+
+| Sự kiện | Workflow | Kết quả |
+|---|---|---|
+| Push lên `main`, job `test` pass | job `publish` trong [ci.yml](.github/workflows/ci.yml) | Build image, chạy thử bằng `docker-compose.prod.yml` rồi mở `/login`, đẩy tag `<sha>` và `staging` |
+| Push tag `v*` | [release.yml](.github/workflows/release.yml) | Job chạy trong Environment `production` (chỉ nhận tag `v*`), gắn tag `production` và `vX.Y.Z` vào image `<sha>` của commit đó |
+
+Chạy image đã đẩy lên:
+
+```bash
+cp .env.production.example .env.production   # đổi APP_KEY và các mật khẩu change-me
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d   # IMAGE_TAG=staging để chạy bản staging
+```
+
+- **Production không build lại image:** `release.yml` chỉ gắn thêm tag vào image đã chạy thử ở `publish`, nên bản lên production đúng là bản đã kiểm tra. Tag trên commit chưa qua `publish` thì không có image `<sha>`, job lỗi.
+- **Staging và production khác nhau ở `APP_ENV`:** entrypoint thấy `APP_ENV=production` thì chỉ migrate, không seed, vì seed tạo tài khoản mật khẩu `password` ai cũng biết. `APP_ENV=staging` vẫn seed khi database trống để có dữ liệu demo. Container dev không có biến `APP_ENV` nên entrypoint vẫn cài dependency và tạo `.env` như cũ.
+- **`UserSeeder` dùng `forceCreate`, không dùng `UserFactory`:** factory cần Faker, mà Faker là package dev, không có trong image staging.
+- **Có cả `build` và `image` trong `docker-compose.prod.yml`:** CI dùng chính file này để build, chạy thử rồi push, người dùng dùng nó để pull. Project có tên riêng `test_intern_prod` nên không dùng chung volume database với stack dev. MySQL và MongoDB không mở cổng ra máy, MongoDB bật mật khẩu.
+- **File tài liệu ở volume `storage_app`:** tài liệu IELTS và bản cắt preview nằm ở `storage/app`, phải còn sau khi đổi image.
+- **Cần làm tay một lần trên GitHub:** tạo Environment `staging` và `production` (Settings → Environments). Ở `production`, mục Deployment branches and tags chọn Selected branches and tags, thêm rule kiểu Tag `v*`. Repo private ở gói Free không có Required reviewers, nên bước duyệt là việc push tag: chỉ người có quyền push lên repo mới tạo được tag `v*`. Package trên GHCR mặc định private, muốn pull không cần đăng nhập thì đổi sang public.
+- **Đổi lại:** không deploy lên server nào, phải tự pull và `up`. Tên image ghi cứng `tqanh23`, fork repo phải sửa. Image chỉ build cho `linux/amd64`.
+
 ### Xác thực và phân quyền
 
 - **Breeze + Blade:** có sẵn đăng ký, đăng nhập và giới hạn số lần đăng nhập sai, đi kèm Alpine.js. PHP render trang nên dễ theo dõi hơn SPA.
@@ -521,6 +546,7 @@ Các hạn chế khác:
 - **Xem đáp án rồi làm lại được điểm tối đa:** đề không giới hạn số lần làm, nên học sinh có thể nộp một lần để xem đáp án rồi bắt đầu lại.
 - **Seed không khôi phục dữ liệu đã sửa:** chạy lại `php artisan migrate --seed` không lỗi, nhưng tài khoản hoặc đề đã có sẽ được bỏ qua. Dùng `php artisan migrate:fresh --seed` để đưa MySQL về dữ liệu mẫu ban đầu, lệnh này xóa toàn bộ dữ liệu MySQL hiện có.
 - **Test chạy bằng SQLite in-memory và database MongoDB riêng `exam_testing`:** nhờ vậy test không đụng dữ liệu dev, nhưng không phát hiện được lỗi truy vấn riêng của MySQL. CI chỉ chạy migrate và seed trên MySQL thật. Test cần container `mongo` đang chạy.
+- **CD chưa chạy trên GitHub:** image production, chế độ staging (có seed) và production (không seed) đã chạy thử bằng `docker-compose.prod.yml` trên máy, workflow đã qua `actionlint`, nhưng job `publish` và `release.yml` chỉ chạy được sau khi merge vào `main`.
 - **Chưa thử trên macOS:** các lệnh trên đã chạy thử trên Windows 11 với Docker Desktop. Trên Linux, CI chạy trên Ubuntu mới kiểm tra `docker compose up -d`, test và trang `/login`.
 - **Code xác thực do Breeze sinh ra:** gồm controller trong `app/Http/Controllers/Auth`, view trong `resources/views/auth` và `profile`, test trong `tests/Feature/Auth`. Phần tự viết là middleware `admin`, trang `/admin` và `AdminAccessTest`.
 - **Các commit khung Laravel không phải code tự viết:** chúng được chia nhỏ từ code do `composer create-project` sinh ra.

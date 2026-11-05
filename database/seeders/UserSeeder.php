@@ -4,11 +4,13 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
     /**
-     * Tạo tài khoản mẫu, mật khẩu `password` lấy từ UserFactory.
+     * Tạo tài khoản mẫu, mật khẩu `password`.
+     * Không dùng UserFactory vì factory cần Faker, mà Faker là package dev, không có trong image staging.
      */
     public function run(): void
     {
@@ -19,8 +21,11 @@ class UserSeeder extends Seeder
 
         foreach ($accounts as $account) {
             if (! User::where('email', $account['email'])->exists()) {
-                // Factory gán được role dù role không nằm trong $fillable.
-                User::factory()->create($account);
+                // forceCreate gán được role dù role không nằm trong $fillable.
+                User::forceCreate($account + [
+                    'password' => Hash::make('password'),
+                    'email_verified_at' => now(),
+                ]);
             }
         }
     }

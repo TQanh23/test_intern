@@ -33,3 +33,52 @@ jobs:
       - name: In log container
         if: always()
         run: docker compose logs --tail=200
+
+  # Chỉ chạy khi push lên main và job test đã pass: build image production, chạy thử, rồi đẩy lên GHCR với tag <sha> và staging.
+  publish:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    permissions:
+      contents: read
+      packages: write
+    # Hai lần push liên tiếp không chạy song song, nên tag staging luôn là commit mới nhất.
+    concurrency:
+      group: publish
+      cancel-in-progress: false
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Chỉ để chạy thử trên runner: mật khẩu mẫu, APP_KEY ngẫu nhiên, chế độ production (không seed).
+      - name: Tạo .env.production
+        run: |
+          cp .env.production.example .env.production
+          sed -i "s|^APP_KEY=$|APP_KEY=base64:$(openssl rand -base64 32)|" .env.production
+
+      - name: Build và khởi động image production
+        run: docker compose -f docker-compose.prod.yml up -d --build --wait
+
+      # Kiểm tra image thật: vendor không có package dev, asset build sẵn, migrate MySQL, MongoDB có mật khẩu.
+      - name: Mở trang đăng nhập
+        run: curl -fsS --retry 5 --retry-connrefused --retry-delay 2 -o /dev/null http://localhost:8000/login
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build lần hai lấy toàn bộ từ cache, chỉ gắn thêm tên staging.
+      - name: Đẩy image lên GHCR
+        run: |
+          docker compose -f docker-compose.prod.yml push
+          IMAGE_TAG=staging docker compose -f docker-compose.prod.yml build
+          IMAGE_TAG=staging docker compose -f docker-compose.prod.yml push
+
+      - name: In log container
+        if: always()
+        run: docker compose -f docker-compose.prod.yml logs --tail=200

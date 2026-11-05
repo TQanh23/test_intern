@@ -1,0 +1,87 @@
+# Chạy image đã build sẵn trên GHCR, không bind mount code.
+#   cp .env.production.example .env.production   # rồi điền APP_KEY và mật khẩu
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+# IMAGE_TAG mặc định là production, đặt IMAGE_TAG=staging để chạy bản staging.
+# Có cả build lẫn image để CI build, smoke test rồi push đúng tên image này.
+# Đặt tên project riêng để không dùng chung container và volume database với stack dev.
+name: test_intern_prod
+
+services:
+  app:
+    image: ghcr.io/tqanh23/test_intern-app:${IMAGE_TAG:-production}
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: prod
+    env_file: .env.production
+    volumes:
+      # File tài liệu IELTS và bản cắt preview nằm ở storage/app, phải còn sau khi đổi image.
+      - storage_app:/var/www/html/storage/app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9000"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+      start_period: 2m
+    restart: unless-stopped
+
+  scheduler:
+    image: ghcr.io/tqanh23/test_intern-app:${IMAGE_TAG:-production}
+    command: php artisan schedule:work
+    env_file: .env.production
+    volumes:
+      - storage_app:/var/www/html/storage/app
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/tqanh23/test_intern-web:${IMAGE_TAG:-production}
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: web
+    ports:
+      - "8000:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Không mở cổng database ra máy, chỉ app trong mạng compose kết nối được.
+  mysql:
+    image: mysql:8.0
+    env_file: .env.production
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # Bật xác thực bằng MONGO_INITDB_ROOT_USERNAME/PASSWORD, khác bản dev.
+  mongo:
+    image: mongo:7
+    env_file: .env.production
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  storage_app:
+  mysql_data:
+  mongo_data:
