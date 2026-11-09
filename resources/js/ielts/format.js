@@ -6,12 +6,12 @@ export const formatPrice = (vnd) => priceFormat.format(vnd);
 
 // Viết đủ tên class để Tailwind quét được (tailwind.config.js có quét resources/js).
 const LEVEL_CLASSES = {
-    1: 'bg-teal-100 text-teal-800',
-    2: 'bg-indigo-100 text-indigo-800',
-    3: 'bg-rose-100 text-rose-800',
+    1: 'bg-emerald-100 text-emerald-700',
+    2: 'bg-sky-100 text-sky-700',
+    3: 'bg-violet-100 text-violet-700',
 };
 
-export const levelClass = (level) => LEVEL_CLASSES[level] ?? 'bg-gray-100 text-gray-800';
+export const levelClass = (level) => LEVEL_CLASSES[level] ?? 'bg-slate-100 text-slate-700';
 
 export function describeDocument(doc) {
     return doc.type === 'pdf'
