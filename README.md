@@ -418,6 +418,7 @@ curl -i http://localhost:8000/storage/documents/level-1/unit-1.pdf   # 404
 Link "Gói IELTS" ở thanh menu, cho mọi tài khoản. Trang quản trị và trang thống kê có link sang trang lượt xem thử.
 
 - **Blade + Alpine.js, không dùng Vue/React (Inertia):** Breeze đã cài sẵn Alpine, Tailwind và axios, nên không thêm router hay bước build mới. Blade chỉ dựng khung trang (`Route::view`), Alpine gọi API rồi hiển thị. Chỉ thêm một package là `pdfjs-dist`.
+- **Giao diện kiểu "học tập tươi sáng", chỉ dùng Tailwind:** không thêm thư viện UI. Style nằm trong các Blade component dùng chung (`resources/views/components`), nên đổi một chỗ là đổi cả site. Admin có layout riêng với thanh bên (`<x-admin-layout>`), thu thành nút ☰ trên điện thoại. Đã xem thử bằng Edge headless ở 1280 px và 375 px, không có thanh cuộn ngang.
 - **Trang web gọi API bằng cookie session:** `bootstrap/app.php` bật `statefulApi()` (chế độ SPA của Sanctum). Request từ `localhost:8000` dùng session đăng nhập web, axios tự gửi header `X-XSRF-TOKEN`, nên JS không phải giữ token. Postman và curl vẫn dùng Bearer token như cũ.
 - **Component tách theo việc:**
 
