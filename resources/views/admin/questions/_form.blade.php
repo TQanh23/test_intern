@@ -8,17 +8,17 @@
 
     <div>
         <x-input-label for="content" value="Nội dung câu hỏi" />
-        <textarea id="content" name="content" rows="3" required maxlength="5000" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">{{ old('content', $question->content) }}</textarea>
+        <textarea id="content" name="content" rows="3" required maxlength="5000" class="mt-1 block w-full border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl shadow-sm">{{ old('content', $question->content) }}</textarea>
         <x-input-error class="mt-2" :messages="$errors->get('content')" />
     </div>
 
     <fieldset class="space-y-4">
-        <legend class="font-medium text-sm text-gray-700">Đáp án (chọn đáp án đúng)</legend>
+        <legend class="font-medium text-sm text-slate-700">Đáp án (chọn đáp án đúng)</legend>
 
         @foreach (range(0, 3) as $index)
             <div>
                 <div class="flex items-center gap-3">
-                    <input type="radio" name="correct_option" value="{{ $index }}" required @checked((string) $correctOption === (string) $index) aria-label="Đáp án {{ $index + 1 }} là đáp án đúng" class="border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <input type="radio" name="correct_option" value="{{ $index }}" required @checked((string) $correctOption === (string) $index) aria-label="Đáp án {{ $index + 1 }} là đáp án đúng" class="border-slate-300 text-indigo-600 focus:ring-indigo-500">
                     <x-text-input name="options[]" type="text" class="block w-full" :value="old('options.'.$index, $question->options[$index]->content ?? '')" required maxlength="1000" aria-label="Đáp án {{ $index + 1 }}" />
                 </div>
                 <x-input-error class="mt-2" :messages="$errors->get('options.'.$index)" />
