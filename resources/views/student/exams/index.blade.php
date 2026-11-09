@@ -11,10 +11,10 @@
                 <div class="grid gap-4 sm:grid-cols-2">
                     @foreach ($exams as $exam)
                         {{-- Nền thẻ xoay vòng 4 màu pastel; viết đủ tên class để Tailwind quét được. --}}
-                        <div class="{{ ['bg-sky-50', 'bg-violet-50', 'bg-amber-50', 'bg-emerald-50'][$loop->index % 4] }} rounded-2xl shadow-sm p-6 flex flex-col gap-4">
-                            <div>
+                        <div class="{{ ['bg-sky-50', 'bg-violet-50', 'bg-amber-50', 'bg-emerald-50'][$loop->index % 4] }} rounded-2xl shadow-sm p-6 flex flex-col gap-4 min-w-0">
+                            <div class="min-w-0">
                                 <span class="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-700">{{ $exam->duration_minutes }} phút</span>
-                                <p class="mt-3 text-lg font-extrabold text-slate-900">{{ $exam->name }}</p>
+                                <p class="mt-3 text-lg font-extrabold text-slate-900 break-words">{{ $exam->name }}</p>
                                 <p class="mt-1 text-sm text-slate-600">{{ $exam->questions_count }} câu</p>
                             </div>
                             <form method="POST" action="{{ route('attempts.store', $exam) }}">

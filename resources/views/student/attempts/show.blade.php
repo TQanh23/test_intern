@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-extrabold text-2xl text-slate-900 leading-tight">{{ $attempt->exam_name }}</h2>
+        <h2 class="font-extrabold text-2xl text-slate-900 leading-tight break-words">{{ $attempt->exam_name }}</h2>
     </x-slot>
 
     <div class="py-6">
@@ -18,7 +18,7 @@
                 @foreach ($attempt->questions as $question)
                     {{-- Viền trái theo trạng thái: đúng xanh lá, sai đỏ, chưa trả lời xám. --}}
                     <div @class(['bg-white rounded-2xl shadow-sm p-6 border-l-4', 'border-emerald-500' => $question['is_correct'], 'border-red-500' => ! $question['is_correct'] && $question['selected_option_id'] !== null, 'border-slate-300' => ! $question['is_correct'] && $question['selected_option_id'] === null])>
-                        <p class="font-bold text-slate-900">{{ $loop->iteration }}. {{ $question['content'] }}</p>
+                        <p class="font-bold text-slate-900 break-words">{{ $loop->iteration }}. {{ $question['content'] }}</p>
 
                         <p @class(['mt-1 text-sm font-semibold', 'text-emerald-700' => $question['is_correct'], 'text-red-600' => ! $question['is_correct']])>
                             @if ($question['is_correct'])
@@ -96,8 +96,8 @@
 
                     <div class="sticky top-0 z-10 bg-gradient-to-br from-sky-500 to-indigo-500 text-white rounded-2xl px-6 py-4 space-y-3">
                         <div class="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                                <p class="font-extrabold">{{ $attempt->exam_name }}</p>
+                            <div class="min-w-0">
+                                <p class="font-extrabold break-words">{{ $attempt->exam_name }}</p>
                                 <p class="text-sm">Hạn nộp: {{ $attempt->deadline_at->timezone('Asia/Ho_Chi_Minh')->format('H:i d/m/Y') }}</p>
                             </div>
                             <p class="rounded-full bg-white/20 px-4 py-1 tabular-nums">
@@ -111,10 +111,10 @@
                     </div>
 
                     @foreach ($attempt->questions as $question)
-                        <fieldset class="bg-white rounded-2xl shadow-sm p-6">
+                        <fieldset class="bg-white rounded-2xl shadow-sm p-6 min-w-0">
                             <legend class="sr-only">Câu {{ $loop->iteration }}</legend>
                             <span class="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-700">Câu {{ $loop->iteration }} / {{ $loop->count }}</span>
-                            <p class="mt-3 font-bold text-slate-900">{{ $loop->iteration }}. {{ $question['content'] }}</p>
+                            <p class="mt-3 font-bold text-slate-900 break-words">{{ $loop->iteration }}. {{ $question['content'] }}</p>
 
                             <div class="mt-4 space-y-2">
                                 @foreach ($question['options'] as $option)
