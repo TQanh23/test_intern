@@ -14,7 +14,7 @@
     </head>
     <body class="font-sans antialiased">
         {{-- Nền gradient giống khung khách --}}
-        <div class="min-h-screen flex flex-col items-center justify-center px-4 text-center bg-gradient-to-br from-sky-500 to-indigo-500">
+        <div class="min-h-screen flex flex-col items-center justify-center px-4 text-center bg-gradient-to-br from-sky-700 to-indigo-600">
             <x-application-logo class="text-5xl !text-white" />
             <p class="mt-4 text-lg text-white/90">Hệ thống thi trắc nghiệm trực tuyến</p>
 

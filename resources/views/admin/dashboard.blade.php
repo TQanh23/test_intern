@@ -7,7 +7,7 @@
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-            <div class="rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 p-6 text-white shadow-sm">
+            <div class="rounded-2xl bg-gradient-to-r from-sky-700 to-indigo-600 p-6 text-white shadow-sm">
                 <p>Xin chào {{ auth()->user()->name }}. Chỉ tài khoản admin mới vào được trang này.</p>
             </div>
 

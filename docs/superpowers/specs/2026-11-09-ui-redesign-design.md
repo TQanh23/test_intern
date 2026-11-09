@@ -55,7 +55,7 @@ Thành công nghĩa là: mở bất kỳ màn hình nào cũng thấy cùng mộ
 | --- | --- |
 | Nền trang | `bg-slate-50` |
 | Thẻ (card) | `bg-white rounded-2xl shadow-sm`, padding `p-6` |
-| Màu nhấn | gradient `from-sky-500 to-indigo-500` cho banner và mục đang chọn; chữ logo `text-sky-500 font-extrabold` |
+| Màu nhấn | gradient `from-sky-700 to-indigo-600` cho banner và mục đang chọn (chữ trắng trên nền này đạt độ tương phản AA); chữ logo `text-sky-500 font-extrabold` |
 | Nút chính | `bg-slate-900 text-white rounded-full`, không viết hoa toàn bộ (bỏ `uppercase tracking-widest` của Breeze) |
 | Nút phụ / nút nguy hiểm | cùng dáng viên thuốc `rounded-full`; phụ là `bg-white ring-1 ring-slate-200`, nguy hiểm là `bg-red-600` |
 | Ô nhập | `rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500` |

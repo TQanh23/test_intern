@@ -3,7 +3,7 @@
         <h2 class="font-extrabold text-2xl text-slate-900">Lượt xem thử gói IELTS</h2>
     </x-slot>
 
-    <div class="py-8 sm:py-6">
+    <div class="py-6">
         <div x-data="previewStats" class="mx-auto max-w-7xl space-y-4 px-4 sm:px-6 lg:px-8">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <p class="text-sm text-slate-600">Mỗi lần bấm Xem thử tính một lượt. Top 10 gói và top 10 tài liệu.</p>
@@ -28,7 +28,7 @@
                                             <span class="shrink-0 tabular-nums text-slate-600" x-text="row.views + ' lượt'"></span>
                                         </div>
                                         <div class="mt-2 h-2 rounded-full bg-slate-100">
-                                            <div class="h-2 rounded-full bg-gradient-to-r from-sky-500 to-indigo-500" :style="{ width: barWidth(stats.packages, row) }"></div>
+                                            <div class="h-2 rounded-full bg-gradient-to-r from-sky-700 to-indigo-600" :style="{ width: barWidth(stats.packages, row) }"></div>
                                         </div>
                                     </li>
                                 </template>
@@ -48,7 +48,7 @@
                                             <span class="shrink-0 tabular-nums text-slate-600" x-text="row.views + ' lượt'"></span>
                                         </div>
                                         <div class="mt-2 h-2 rounded-full bg-slate-100">
-                                            <div class="h-2 rounded-full bg-gradient-to-r from-sky-500 to-indigo-500" :style="{ width: barWidth(stats.documents, row) }"></div>
+                                            <div class="h-2 rounded-full bg-gradient-to-r from-sky-700 to-indigo-600" :style="{ width: barWidth(stats.documents, row) }"></div>
                                         </div>
                                     </li>
                                 </template>

@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-slate-900 leading-tight">Gói tài liệu IELTS</h2>
+        <h2 class="font-extrabold text-2xl text-slate-900">Gói tài liệu IELTS</h2>
     </x-slot>
 
     <div class="py-6">

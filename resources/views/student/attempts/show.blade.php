@@ -9,7 +9,7 @@
             <x-input-error :messages="$errors->get('attempt')" />
 
             @if ($attempt->status === 'submitted')
-                <div class="bg-gradient-to-br from-sky-500 to-indigo-500 text-white rounded-2xl p-6">
+                <div class="bg-gradient-to-br from-sky-700 to-indigo-600 text-white rounded-2xl p-6">
                     <p class="text-sm font-semibold">Kết quả</p>
                     <p class="mt-1 text-4xl font-extrabold tabular-nums">{{ $attempt->score }}/{{ $attempt->total }}</p>
                     <p class="mt-1 text-sm">câu đúng</p>
@@ -32,7 +32,7 @@
 
                         <ul class="mt-4 space-y-2 text-slate-700">
                             @foreach ($question['options'] as $option)
-                                <li @class(['font-semibold text-emerald-700' => $option['is_correct']])>
+                                <li @class(['break-words font-semibold text-emerald-700' => $option['is_correct']])>
                                     {{ $option['content'] }}
                                     @if ($option['option_id'] === $question['selected_option_id'])
                                         (Bạn chọn)
@@ -94,13 +94,13 @@
                     }">
                     @csrf
 
-                    <div class="sticky top-0 z-10 bg-gradient-to-br from-sky-500 to-indigo-500 text-white rounded-2xl px-6 py-4 space-y-3">
+                    <div class="sticky top-0 z-10 bg-gradient-to-br from-sky-700 to-indigo-600 text-white rounded-2xl px-6 py-4 space-y-3">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div class="min-w-0">
                                 <p class="font-extrabold break-words">{{ $attempt->exam_name }}</p>
                                 <p class="text-sm">Hạn nộp: {{ $attempt->deadline_at->timezone('Asia/Ho_Chi_Minh')->format('H:i d/m/Y') }}</p>
                             </div>
-                            <p class="rounded-full bg-white/20 px-4 py-1 tabular-nums">
+                            <p class="rounded-full bg-slate-900/20 px-4 py-1 tabular-nums">
                                 Còn lại: <span class="font-bold" x-text="clock()">{{ sprintf('%d:%02d', intdiv($remaining, 60), $remaining % 60) }}</span>
                             </p>
                         </div>
@@ -121,8 +121,8 @@
                                     <label class="flex items-center gap-3 rounded-xl border-2 border-slate-200 px-4 py-3 text-slate-700 cursor-pointer hover:bg-slate-50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-indigo-500">
                                         <input type="radio" name="answers[{{ $question['question_id'] }}]" value="{{ $option['option_id'] }}" @checked($option['option_id'] === $question['selected_option_id'])
                                             @change="count(); save({{ $question['question_id'] }}, {{ $option['option_id'] }})"
-                                            class="border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                                        <span>{{ $option['content'] }}</span>
+                                            class="shrink-0 border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                        <span class="min-w-0 break-words">{{ $option['content'] }}</span>
                                     </label>
                                 @endforeach
                             </div>

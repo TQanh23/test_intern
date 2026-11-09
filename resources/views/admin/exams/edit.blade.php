@@ -30,10 +30,10 @@
                     <ol class="mt-4 divide-y divide-slate-100">
                         @foreach ($exam->questions as $question)
                             <li class="py-4">
-                                <p class="font-medium text-slate-900">{{ $loop->iteration }}. {{ $question->content }}</p>
+                                <p class="break-words font-medium text-slate-900">{{ $loop->iteration }}. {{ $question->content }}</p>
                                 <ul class="mt-2 space-y-1 text-sm text-slate-600">
                                     @foreach ($question->options as $option)
-                                        <li @class(['font-semibold text-slate-900' => $option->is_correct])>
+                                        <li @class(['break-words font-semibold text-slate-900' => $option->is_correct])>
                                             {{ $option->content }}
                                             @if ($option->is_correct)
                                                 <span class="ms-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">(đáp án đúng)</span>

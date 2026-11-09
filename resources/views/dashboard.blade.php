@@ -2,7 +2,7 @@
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
             {{-- Banner chào, chỉ có lời chào và tên --}}
-            <div class="rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-500 text-white p-8">
+            <div class="rounded-2xl bg-gradient-to-br from-sky-700 to-indigo-600 text-white p-8">
                 <h1 class="text-2xl font-extrabold">Chào {{ auth()->user()->name }} 👋</h1>
             </div>
 

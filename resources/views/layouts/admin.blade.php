@@ -22,11 +22,11 @@
                 ['Đề thi', 'admin.exams.index', ['admin.exams.*', 'admin.questions.*']],
                 ['Thống kê', 'admin.statistics', ['admin.statistics']],
                 ['Lượt xem thử', 'admin.preview-statistics', ['admin.preview-statistics']],
-                ['Gói IELTS', 'packages.index', ['packages.*']],
+                ['Gói IELTS', 'packages.index', []],
             ];
         @endphp
 
-        <div x-data="{ open: false }" class="min-h-screen bg-slate-50">
+        <div x-data="{ open: false }" x-on:keydown.escape.window="open = false" class="min-h-screen bg-slate-50">
             <!-- Thanh trên cùng (chỉ hiện dưới lg) -->
             <div class="flex h-14 items-center justify-between bg-slate-900 px-4 lg:hidden">
                 <a href="{{ route('admin.dashboard') }}">
@@ -43,7 +43,8 @@
             <div x-show="open" x-cloak x-on:click="open = false" class="fixed inset-0 z-30 bg-slate-900/50 lg:hidden"></div>
 
             <!-- Sidebar: cố định từ lg trở lên, dưới lg là ngăn kéo -->
-            <aside :class="open ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-slate-900 text-slate-300 transition-transform lg:translate-x-0">
+            {{-- invisible: bỏ ngăn kéo đang đóng khỏi thứ tự Tab và trình đọc màn hình --}}
+            <aside :class="{ 'translate-x-0 visible': open, '-translate-x-full invisible': !open }" class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full invisible flex-col bg-slate-900 text-slate-300 transition-transform lg:visible lg:translate-x-0">
                 <div class="flex h-16 items-center justify-between px-6">
                     <a href="{{ route('admin.dashboard') }}">
                         <x-application-logo class="text-2xl" />
@@ -58,7 +59,7 @@
                 <nav class="flex-1 space-y-1 px-3 py-4" aria-label="Menu quản trị">
                     @foreach ($items as [$label, $routeName, $patterns])
                         <a href="{{ route($routeName) }}" @if (request()->routeIs(...$patterns)) aria-current="page" @endif
-                            class="block rounded-xl px-3 py-2 text-sm font-semibold transition {{ request()->routeIs(...$patterns) ? 'bg-gradient-to-r from-sky-500 to-indigo-500 text-white' : 'hover:bg-slate-800 hover:text-white' }}">
+                            class="block rounded-xl px-3 py-2 text-sm font-semibold transition {{ request()->routeIs(...$patterns) ? 'bg-gradient-to-r from-sky-700 to-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white' }}">
                             {{ $label }}
                         </a>
                     @endforeach
