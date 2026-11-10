@@ -1,6 +1,6 @@
 {{-- Icon theo loại tài liệu. Đọc biến `doc` (có `type`) của scope Alpine bao quanh. --}}
-<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-    :class="doc?.type === 'pdf' ? 'bg-rose-100 text-rose-600' : 'bg-sky-100 text-sky-600'">
+<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+    :class="doc?.type === 'pdf' ? 'bg-red-50 text-red-600' : 'bg-brand-pale text-brand'">
     <svg x-show="doc?.type === 'pdf'" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" />
         <path stroke-linecap="round" stroke-linejoin="round" d="M14 3v5h5M9 13h6M9 17h4" />

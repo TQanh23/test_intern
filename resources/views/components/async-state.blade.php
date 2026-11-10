@@ -20,15 +20,15 @@
         @endisset
     </div>
 
-    <div x-show="status === 'error'" x-cloak role="alert" class="rounded-2xl border border-red-200 bg-red-50 px-6 py-8 text-center">
+    <div x-show="status === 'error'" x-cloak role="alert" class="rounded-xl border border-red-200 bg-red-50 px-6 py-8 text-center">
         <p class="font-medium text-red-800" x-text="error"></p>
         <button type="button" x-on:click="{{ $retry }}"
-            class="mt-4 inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm ring-1 ring-red-200 hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+            class="mt-4 inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm ring-1 ring-red-200 hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
             Thử lại
         </button>
     </div>
 
-    <div x-show="status === 'empty'" x-cloak class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-600">
+    <div x-show="status === 'empty'" x-cloak class="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-600">
         @isset($empty)
             {{ $empty }}
         @else

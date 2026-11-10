@@ -1,25 +1,25 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-extrabold text-2xl text-slate-900">
+        <h2 class="font-display font-bold text-2xl tracking-tight text-ink sm:text-3xl">
             {{ __('Profile') }}
         </h2>
     </x-slot>
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
+            <div class="rounded-xl bg-white p-6 shadow-sm">
                 <div class="max-w-xl">
                     @include('profile.partials.update-profile-information-form')
                 </div>
             </div>
 
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
+            <div class="rounded-xl bg-white p-6 shadow-sm">
                 <div class="max-w-xl">
                     @include('profile.partials.update-password-form')
                 </div>
             </div>
 
-            <div class="rounded-2xl bg-white p-6 shadow-sm">
+            <div class="rounded-xl bg-white p-6 shadow-sm">
                 <div class="max-w-xl">
                     @include('profile.partials.delete-user-form')
                 </div>
